@@ -1,3 +1,5 @@
+// simplecalc/Lexer.java
+
 package simplecalc;
 
 import java.util.ArrayList;
@@ -22,7 +24,6 @@ public class Lexer {
         keywords.put("if", Token.TokenType.IF_KEYWORD);
         keywords.put("print", Token.TokenType.PRINT_KEYWORD);
         keywords.put("readLine", Token.TokenType.READLINE_KEYWORD);
-        // Nuevas palabras clave para ciclos
         keywords.put("while", Token.TokenType.WHILE_KEYWORD);
         keywords.put("for", Token.TokenType.FOR_KEYWORD);
         keywords.put("in", Token.TokenType.IN_KEYWORD);
@@ -45,7 +46,6 @@ public class Lexer {
         char c = advanceLexerChar();
 
         switch (c) {
-            // Caracteres simples
             case '(': addToken(Token.TokenType.PAREN_IZQ); break;
             case ')': addToken(Token.TokenType.PAREN_DER); break;
             case '{': addToken(Token.TokenType.LLAVE_IZQ); break;
@@ -55,20 +55,19 @@ public class Lexer {
             case '*': addToken(Token.TokenType.OP_MULT); break;
             case ':': addToken(Token.TokenType.DOS_PUNTOS); break;
 
-            // Operadores de uno o dos caracteres
             case '=':
                 addToken(matchLexerChar('=') ? Token.TokenType.OP_IGUAL_IGUAL : Token.TokenType.ASIGNACION);
                 break;
             case '<':
                 if (matchLexerChar('=')) {
-                    addErrorToken("Operador relacional '<=' no está permitido. Use '<' o '=='.");
+                    addErrorTokenSimple("Operador relacional '<=' no está permitido. Use '<' o '=='."); // Usar simple
                 } else {
                     addToken(Token.TokenType.OP_MENOR);
                 }
                 break;
             case '>':
                 if (matchLexerChar('=')) {
-                    addErrorToken("Operador relacional '>=' no está permitido. Use '>' o '=='.");
+                    addErrorTokenSimple("Operador relacional '>=' no está permitido. Use '>' o '=='."); // Usar simple
                 } else {
                     addToken(Token.TokenType.OP_MAYOR);
                 }
@@ -78,24 +77,21 @@ public class Lexer {
                 break;
             case '.':
                 if (matchLexerChar('.')) {
-                    addToken(Token.TokenType.DOT_DOT); // Para operador de rango ".."
+                    addToken(Token.TokenType.DOT_DOT);
                 } else {
-                    addErrorToken("Caracter inesperado: '.' (posiblemente un punto solitario, se esperaba '..')");
+                    addErrorTokenSimple("Caracter inesperado: '.' (se esperaba '..' para rango)"); // Usar simple
                 }
                 break;
 
-
-            // Espacios en blanco
             case ' ':
             case '\r':
             case '\t':
                 break;
             case '\n':
-                addToken(Token.TokenType.EOL, "\\n"); // Se sigue detectando y agregando EOL para el parser
+                addToken(Token.TokenType.EOL, "\\n");
                 line++;
                 break;
 
-            // Literales de cadena
             case '"':
                 string();
                 break;
@@ -106,35 +102,31 @@ public class Lexer {
                 } else if (isAlphaStart(c)) {
                     identifier();
                 } else {
-                    // `c` es un carácter inesperado. Construiremos una secuencia de error.
                     StringBuilder invalidSequenceBuilder = new StringBuilder();
                     invalidSequenceBuilder.append(c);
 
-                    // Consumir caracteres subsiguientes de forma "codiciosa" para formar un único token de error.
-                    // Se detendrá solo si se encuentra un espacio en blanco, una nueva línea,
-                    // o un carácter que *claramente* inicia un nuevo token válido (paréntesis, llave, operador, literal de cadena).
-                    // Esto agrupa "5%0" como '%0' en el token de error, asumiendo que '5' ya fue tokenizado.
                     while (!isAtLexerEnd() &&
-                           !Character.isWhitespace(peekLexerChar()) && // Detener en espacios
-                           peekLexerChar() != '\n' && // Detener en saltos de línea
-                           peekLexerChar() != '(' && peekLexerChar() != ')' && // Delimitadores
-                           peekLexerChar() != '{' && peekLexerChar() != '}' &&
-                           peekLexerChar() != '+' && peekLexerChar() != '-' && // Operadores
-                           peekLexerChar() != '*' && peekLexerChar() != '/' &&
-                           peekLexerChar() != '=' && peekLexerChar() != '<' &&
-                           peekLexerChar() != '>' && peekLexerChar() != ':' &&
-                           peekLexerChar() != '"' && peekLexerChar() != '.' // Añadido '.' para que no lo agrupe con otros errores
+                           !Character.isWhitespace(peekLexerChar()) &&
+                           peekLexerChar() != '\n' &&
+                           !isClearDelimiter(peekLexerChar())
                            ) {
                         invalidSequenceBuilder.append(advanceLexerChar());
                     }
-                    addErrorToken("Secuencia de caracteres inesperada: '" + invalidSequenceBuilder.toString() + "'");
+                    // NUEVA LÓGICA: Llamar a addErrorToken con contexto
+                    addErrorToken("Secuencia de caracteres inesperada: '%s'", invalidSequenceBuilder.toString());
                 }
                 break;
         }
     }
 
+    private boolean isClearDelimiter(char c) {
+        return c == '(' || c == ')' || c == '{' || c == '}' ||
+               c == '+' || c == '-' || c == '*' || c == '/' ||
+               c == '=' || c == '<' || c == '>' || c == ':' ||
+               c == '"' || (c == '.' && current + 1 < source.length() && source.charAt(current + 1) == '.');
+    }
+
     private void identifier() {
-        // Permitir tanto minúsculas como mayúsculas para Kotlin
         while (isAlphaNumeric(peekLexerChar())) advanceLexerChar();
 
         String text = source.substring(start, current);
@@ -154,7 +146,7 @@ public class Lexer {
         try {
             addToken(Token.TokenType.NUMERO_ENTERO, Integer.parseInt(numStr));
         } catch (NumberFormatException e) {
-             addErrorToken("Número entero inválido o muy grande: '" + numStr + "'");
+             addErrorTokenSimple("Número entero inválido o muy grande: '" + numStr + "'"); // Usar simple
         }
     }
     
@@ -162,7 +154,7 @@ public class Lexer {
         while (peekLexerChar() != '"' && !isAtLexerEnd()) {
             char peeked = peekLexerChar();
             if (peeked == '\n' || peeked == '\r') {
-                 addErrorToken("Salto de línea o retorno de carro no permitido en cadena literal.");
+                 addErrorTokenSimple("Salto de línea o retorno de carro no permitido en cadena literal."); // Usar simple
                  while(peekLexerChar() != '"' && !isAtLexerEnd() && peekLexerChar() != '\n' && peekLexerChar() != '\r') {
                      advanceLexerChar();
                  }
@@ -172,10 +164,10 @@ public class Lexer {
         }
 
         if (isAtLexerEnd()) {
-            addErrorToken("Cadena literal no terminada.");
+            addErrorTokenSimple("Cadena literal no terminada."); // Usar simple
             return;
         }
-        advanceLexerChar(); // Consumir la comilla de cierre
+        advanceLexerChar();
         String value = source.substring(start + 1, current - 1);
         addToken(Token.TokenType.CADENA_LITERAL, value);
     }
@@ -207,7 +199,6 @@ public class Lexer {
     }
 
     private boolean isAlphaStart(char c) {
-        // Permitir tanto minúsculas como mayúsculas para Kotlin
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
     }
 
@@ -224,10 +215,47 @@ public class Lexer {
         tokens.add(new Token(type, text, literal, line, calculateColumnForCurrentPos(start)));
     }
     
-    private void addErrorToken(String message) {
+    // Nuevo método para agregar errores léxicos simples sin contexto especial
+    private void addErrorTokenSimple(String message) {
         String problematicLexeme = source.substring(start, current);
         tokens.add(new Token(Token.TokenType.ERROR, problematicLexeme + " (" + message + ")",
                              null, line, calculateColumnForCurrentPos(start)));
+    }
+
+    // Método principal para agregar errores léxicos, intentando incluir el contexto
+    private void addErrorToken(String format, Object... args) {
+        String problemLexeme = String.format(format, args);
+        String fullProblematicLexeme = problemLexeme;
+        int errorColumn = calculateColumnForCurrentPos(start);
+        int errorStart = start;
+
+        // Lógica para intentar incluir el lexema anterior si es un número o ID
+        if (!tokens.isEmpty()) {
+            Token lastToken = tokens.get(tokens.size() - 1);
+            // Si el error actual está inmediatamente después del último token
+            // y el último token es un ID o NUMERO_ENTERO, lo consideramos parte del mismo lexema fallido
+            // Asumimos que no hay espacios en blanco entre el token válido y el inválido.
+            if (lastToken.line == line && 
+                (lastToken.type == Token.TokenType.ID || lastToken.type == Token.TokenType.NUMERO_ENTERO) &&
+                lastToken.column + lastToken.lexeme.length() == calculateColumnForCurrentPos(start)) {
+                
+                fullProblematicLexeme = lastToken.lexeme + problemLexeme;
+                errorColumn = lastToken.column; // El error empieza donde empezó el token anterior
+                errorStart = start - lastToken.lexeme.length(); // El inicio real en la fuente
+                
+                // NOTA: Para que esto funcione perfectamente, deberíamos *reemplazar* el último token
+                // con el token de error extendido, o al menos no añadir el token válido antes.
+                // Sin embargo, modificar la lista de tokens ya generados es complicado.
+                // Por ahora, solo se modifica el MENSAJE del error, y el resaltado se hará desde
+                // la columna del token anterior.
+            }
+        }
+        
+        // El lexema del token en sí seguirá siendo solo la parte inválida (ej. "%2") para el resaltado directo.
+        // Pero el mensaje incluirá el contexto.
+        tokens.add(new Token(Token.TokenType.ERROR, source.substring(start, current), // Lexema real del token de error
+                             null, line, calculateColumnForCurrentPos(start), 
+                             String.format("Secuencia de caracteres inesperada: '%s'", fullProblematicLexeme)));
     }
 
     private int calculateColumnForCurrentPos(int tokenStartIndex) {

@@ -1,8 +1,10 @@
+// simplecalc/SimpleCalcGUI.java
+
 package simplecalc;
 
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.DefaultHighlighter; // Asegúrate de que esta importación esté presente
 import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -18,45 +20,52 @@ public class SimpleCalcGUI extends JFrame {
     private Highlighter.HighlightPainter errorPainter;
 
     public SimpleCalcGUI() {
-        setTitle("KotlinCalc IDE - Compilador");
-        setSize(800, 600);
+        setTitle("Kotlin IDE - Compilador");
+        setSize(1000, 600); 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         initComponents();
-        errorPainter = new DefaultHighlighter.DefaultHighlightPainter(Color.PINK);
+        // CORRECCIÓN AQUÍ:
+        errorPainter = new DefaultHighlighter.DefaultHighlightPainter(Color.PINK); 
     }
 
     private void initComponents() {
-        // Paneles
         JPanel mainPanel = new JPanel(new BorderLayout(5, 5));
         JPanel topPanel = new JPanel(new BorderLayout(5, 5));
         JPanel centerPanel = new JPanel(new GridLayout(1, 1));
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
-        // Componentes
         inputArea = new JTextArea();
         inputArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
         JScrollPane inputScrollPane = new JScrollPane(inputArea);
-        inputScrollPane.setBorder(BorderFactory.createTitledBorder("Código KotlinCalc"));
+        inputScrollPane.setBorder(BorderFactory.createTitledBorder("Código Kotlin"));
 
-        // Aquí añadimos la numeración
         LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
         inputScrollPane.setRowHeaderView(lineNumbers);
 
-
-        // Texto de ejemplo en Kotlin
         inputArea.setText("fun main() {\n" +
                 "    val numero: Int = 42\n" +
-                "    var resultado: Int = numero + 10\n" +
-                "    print(\"El resultado es: \")\n" +
-                "    print(resultado)\n" +
+                "    var contador: Int = 0\n" +
+                "    while (contador < 3) {\n" +
+                "        print(\"Contador: \")\n" +
+                "        print(contador)\n" +
+                "        print(\"\\n\")\n" +
+                "        contador = contador + 1\n" +
+                "    }\n" +
+                "    \n" +
+                "    val limiteFor: Int = 5\n" +
+                "    for (i in 0..limiteFor) {\n" +
+                "        print(\"Iteracion For: \")\n" +
+                "        print(i)\n" +
+                "        print(\"\\n\")\n" +
+                "    }\n" +
                 "    \n" +
                 "    val input: String = readLine()\n" +
-                "    \n" +
-                "    if (resultado > 50) {\n" +
+                "    if (numero > 50) {\n" +
                 "        print(\"Mayor que 50\")\n" +
                 "    }\n" +
+                "    print(\"Fin del programa de ejemplo.\")\n" +
                 "}");
 
         outputArea = new JTextArea();
@@ -65,8 +74,7 @@ public class SimpleCalcGUI extends JFrame {
         JScrollPane outputScrollPane = new JScrollPane(outputArea);
         outputScrollPane.setBorder(BorderFactory.createTitledBorder("Salida del Compilador"));
 
-        // Botón para compilar código
-        JButton processButton = new JButton("Compilar Código KotlinCalc");
+        JButton processButton = new JButton("Compilar Completo");
         processButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -74,7 +82,30 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // Nuevo botón para cargar archivo
+        JButton lexicalButton = new JButton("Análisis Léxico");
+        lexicalButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                processLexicalAnalysis();
+            }
+        });
+
+        JButton syntaxButton = new JButton("Análisis Sintáctico");
+        syntaxButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                processSyntaxAnalysis();
+            }
+        });
+
+        JButton semanticButton = new JButton("Análisis Semántico");
+        semanticButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                processSemanticAnalysis();
+            }
+        });
+
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
             @Override
@@ -83,7 +114,6 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // Nuevo botón para limpiar
         JButton clearButton = new JButton("Limpiar");
         clearButton.addActionListener(new ActionListener() {
             @Override
@@ -92,18 +122,18 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
         
-        // Panel para agrupar los botones
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
+        buttonPanel.add(lexicalButton);
+        buttonPanel.add(syntaxButton);
+        buttonPanel.add(semanticButton);
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
-
         statusLabel = new JLabel("Listo.");
 
-        // Layout
         topPanel.add(inputScrollPane, BorderLayout.CENTER);
-        topPanel.add(buttonPanel, BorderLayout.SOUTH); // Añadir el panel de botones aquí
+        topPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         centerPanel.add(outputScrollPane);
 
@@ -113,63 +143,38 @@ public class SimpleCalcGUI extends JFrame {
         mainPanel.add(centerPanel, BorderLayout.CENTER);
         mainPanel.add(bottomPanel, BorderLayout.SOUTH);
 
-        // Preferencias de tamaño para las áreas de texto
-        inputScrollPane.setPreferredSize(new Dimension(780, 200));
-        outputScrollPane.setPreferredSize(new Dimension(780, 300));
+        inputScrollPane.setPreferredSize(new Dimension(980, 200));
+        outputScrollPane.setPreferredSize(new Dimension(980, 300));
 
         setContentPane(mainPanel);
     }
 
     private void processCode() {
-        String sourceCode = inputArea.getText();
-        outputArea.setText(""); // Limpiar salida anterior
-        inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados de error anteriores
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Iniciando compilación completa...");
+        statusLabel.setForeground(Color.BLACK);
 
-        // 1. Análisis Léxico
+        String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
         
-        System.out.println("----- TOKENS DEL LEXER (Total: " + tokens.size() + ") -----");
-
         StringBuilder sb = new StringBuilder();
-        sb.append("--- Tokens Reconocidos ---\n");
-        sb.append(Token.getTableHeader()).append("\n");
-        for (Token token : tokens) {
-            // Modificación: No imprimir EOL ni EOF en la tabla de análisis léxico
-            if (token.type != Token.TokenType.EOL && token.type != Token.TokenType.EOF) {
-                sb.append(token.toString()).append("\n");
-            }
-        }
-        sb.append(Token.getTableFooter()).append("\n\n");
-
-        // Filtrar tokens de error léxico para mostrar en la lista de errores
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, t.lexeme))
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
-        // 2. Análisis Sintáctico (y Semántico Básico)
         Parser parser = new Parser(tokens);
         boolean syntaxValid = parser.parse();
         List<String> syntaxAndSemanticErrors = parser.getErrors();
 
-        // 3. Mostrar Resultados
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
             for (String err : lexicalErrors) {
                 sb.append(err).append("\n");
-                try {
-                    // Intentar resaltar el error léxico en el inputArea
-                    if (err.startsWith("[")) {
-                        String locationPart = err.substring(1, err.indexOf("]"));
-                        String[] parts = locationPart.split(",");
-                        int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
-                        int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                        highlightError(line, col, getLexemeLength(err)); // Resaltar el lexema completo del error
-                    }
-                } catch (Exception ex) {
-                    System.err.println("Error al intentar resaltar error léxico: " + ex.getMessage());
-                }
+                highlightErrorFromMessage(err);
             }
             sb.append("\n");
         }
@@ -178,28 +183,15 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("--- Errores Sintácticos/Semánticos Detectados ---\n");
             for (String err : syntaxAndSemanticErrors) {
                 sb.append(err).append("\n");
-                // Intentar resaltar el error en el inputArea
-                try {
-                    // Formato esperado: "[Línea L, Col C] Error..."
-                    if (err.startsWith("[")) {
-                        String locationPart = err.substring(1, err.indexOf("]"));
-                        String[] parts = locationPart.split(",");
-                        int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
-                        int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                        highlightError(line, col); // Resaltar solo un carácter para errores sintácticos/semánticos
-                    }
-                } catch (Exception ex) {
-                    // No se pudo parsear la ubicación del error del mensaje
-                    System.err.println("Error al intentar resaltar error sintáctico/semántico: " + ex.getMessage());
-                }
+                highlightErrorFromMessage(err);
             }
             sb.append("\n");
         }
 
         if (lexicalErrors.isEmpty() && syntaxValid) {
-            sb.append(">>> El código KotlinCalc es léxica y sintácticamente VÁLIDO. <<<\n");
+            sb.append(">>> El código Kotlin es léxica, sintáctica y semánticamente VÁLIDO. <<<\n");
             statusLabel.setText("Resultado: VÁLIDO.");
-            statusLabel.setForeground(new Color(0, 128, 0)); // Verde
+            statusLabel.setForeground(new Color(0, 128, 0));
         } else {
             sb.append(">>> El código contiene errores. <<<\n");
             statusLabel.setText("Resultado: INVÁLIDO.");
@@ -207,44 +199,273 @@ public class SimpleCalcGUI extends JFrame {
         }
 
         outputArea.setText(sb.toString());
-        outputArea.setCaretPosition(0); // Scroll al inicio
-    }
-    
-    // Método auxiliar para obtener la longitud del lexema problemático en el mensaje de error léxico
-    private int getLexemeLength(String errorMessage) {
-        int startIndex = errorMessage.indexOf("Error Léxico: '");
-        if (startIndex != -1) {
-            startIndex += "Error Léxico: '".length();
-            int endIndex = errorMessage.indexOf("'", startIndex);
-            if (endIndex != -1) {
-                return endIndex - startIndex;
-            }
-        }
-        startIndex = errorMessage.indexOf("Secuencia de caracteres inesperada: '");
-        if (startIndex != -1) {
-            startIndex += "Secuencia de caracteres inesperada: '".length();
-            int endIndex = errorMessage.indexOf("'", startIndex);
-            if (endIndex != -1) {
-                return endIndex - startIndex;
-            }
-        }
-        return 1; // Por defecto, resaltar un solo carácter
+        outputArea.setCaretPosition(0);
     }
 
+    private void processLexicalAnalysis() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Realizando análisis léxico...");
+        statusLabel.setForeground(Color.BLACK);
+
+        String sourceCode = inputArea.getText();
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- Tokens Reconocidos ---\n");
+        sb.append(Token.getTableHeader()).append("\n");
+        for (Token token : tokens) {
+            if (token.type != Token.TokenType.EOL && token.type != Token.TokenType.EOF) {
+                sb.append(token.toString()).append("\n");
+            }
+        }
+        sb.append(Token.getTableFooter()).append("\n\n");
+
+        List<String> lexicalErrors = tokens.stream()
+                                           .filter(t -> t.type == Token.TokenType.ERROR)
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                           .collect(Collectors.toList());
+
+        if (!lexicalErrors.isEmpty()) {
+            sb.append("--- Errores Léxicos Detectados ---\n");
+            for (String err : lexicalErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n");
+            statusLabel.setText("Resultado: Léxicamente INVÁLIDO.");
+            statusLabel.setForeground(Color.RED);
+        } else {
+            sb.append(">>> El código es léxicamente VÁLIDO. <<<\n");
+            statusLabel.setText("Resultado: Léxicamente VÁLIDO.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+        }
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+    }
+
+    private void processSyntaxAnalysis() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Realizando análisis sintáctico...");
+        statusLabel.setForeground(Color.BLACK);
+
+        String sourceCode = inputArea.getText();
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+
+        List<String> lexicalErrors = tokens.stream()
+                                           .filter(t -> t.type == Token.TokenType.ERROR)
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                           .collect(Collectors.toList());
+
+        StringBuilder sb = new StringBuilder();
+
+        if (!lexicalErrors.isEmpty()) {
+            sb.append("--- Errores Léxicos Detectados (Impiden Análisis Sintáctico) ---\n");
+            for (String err : lexicalErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n");
+            sb.append(">>> No se puede realizar análisis sintáctico debido a errores léxicos. <<<\n");
+            statusLabel.setText("Resultado: Sintácticamente INVÁLIDO (Errores léxicos).");
+            statusLabel.setForeground(Color.RED);
+        } else {
+            Parser parser = new Parser(tokens);
+            boolean syntaxValid = false;
+            try {
+                syntaxValid = parser.parse();
+            } catch (Exception e) {
+                sb.append("Error grave durante el análisis sintáctico: ").append(e.getMessage()).append("\n");
+            }
+            List<String> syntaxErrors = parser.getErrors().stream()
+                                              .filter(err -> !err.contains("Error semántico"))
+                                              .collect(Collectors.toList());
+
+            if (!syntaxErrors.isEmpty()) {
+                sb.append("--- Errores Sintácticos Detectados ---\n");
+                for (String err : syntaxErrors) {
+                    sb.append(err).append("\n");
+                    highlightErrorFromMessage(err);
+                }
+                sb.append("\n");
+                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
+                statusLabel.setForeground(Color.RED);
+            } else if (!syntaxValid) {
+                sb.append("--- El análisis sintáctico terminó prematuramente o con estado inválido ---\n");
+                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
+                statusLabel.setForeground(Color.RED);
+            }
+            else {
+                sb.append(">>> El código es sintácticamente VÁLIDO. <<<\n");
+                statusLabel.setText("Resultado: Sintácticamente VÁLIDO.");
+                statusLabel.setForeground(new Color(0, 128, 0));
+            }
+        }
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+    }
+
+    private void processSemanticAnalysis() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Realizando análisis semántico...");
+        statusLabel.setForeground(Color.BLACK);
+
+        String sourceCode = inputArea.getText();
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+
+        List<String> lexicalErrors = tokens.stream()
+                                           .filter(t -> t.type == Token.TokenType.ERROR)
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                           .collect(Collectors.toList());
+
+        StringBuilder sb = new StringBuilder();
+
+        if (!lexicalErrors.isEmpty()) {
+            sb.append("--- Errores Léxicos Detectados (Impiden Análisis Semántico) ---\n");
+            for (String err : lexicalErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n");
+            sb.append(">>> No se puede realizar análisis semántico debido a errores léxicos. <<<\n");
+            statusLabel.setText("Resultado: Semánticamente INVÁLIDO (Errores léxicos).");
+            statusLabel.setForeground(Color.RED);
+        } else {
+            Parser parser = new Parser(tokens);
+            parser.parse();
+            List<String> semanticErrors = parser.getErrors().stream()
+                                               .filter(err -> err.contains("Error semántico"))
+                                               .collect(Collectors.toList());
+            List<String> syntaxErrors = parser.getErrors().stream()
+                                                .filter(err -> !err.contains("Error semántico"))
+                                                .collect(Collectors.toList());
+
+            if (!syntaxErrors.isEmpty()) {
+                sb.append("--- Errores Sintácticos Detectados (Impiden Análisis Semántico Completo) ---\n");
+                for (String err : syntaxErrors) {
+                    sb.append(err).append("\n");
+                    highlightErrorFromMessage(err);
+                }
+                sb.append("\n");
+                sb.append(">>> No se puede garantizar un análisis semántico completo debido a errores sintácticos. <<<\n");
+                statusLabel.setText("Resultado: Semánticamente INVÁLIDO (Errores sintácticos).");
+                statusLabel.setForeground(Color.RED);
+            } else if (!semanticErrors.isEmpty()) {
+                sb.append("--- Errores Semánticos Detectados ---\n");
+                for (String err : semanticErrors) {
+                    sb.append(err).append("\n");
+                    highlightErrorFromMessage(err);
+                }
+                sb.append("\n");
+                statusLabel.setText("Resultado: Semánticamente INVÁLIDO.");
+                statusLabel.setForeground(Color.RED);
+            } else {
+                sb.append(">>> El código es semánticamente VÁLIDO. <<<\n");
+                statusLabel.setText("Resultado: Semánticamente VÁLIDO.");
+                statusLabel.setForeground(new Color(0, 128, 0));
+            }
+        }
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+    }
+    
+    private void highlightErrorFromMessage(String errorMessage) {
+        try {
+            if (errorMessage.startsWith("[")) {
+                String locationPart = errorMessage.substring(1, errorMessage.indexOf("]"));
+                String[] parts = locationPart.split(",");
+                int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
+                int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
+                
+                // Extraer el lexema a resaltar (que ahora podría ser "4%2" o "cont%ador")
+                String lexemeToHighlight = "";
+                int lexemeLength = 1; // Default length
+
+                int startErrorMsgContent = errorMessage.indexOf("Error Léxico: '");
+                if (startErrorMsgContent != -1) {
+                    startErrorMsgContent += "Error Léxico: '".length();
+                    int endErrorMsgContent = errorMessage.indexOf("'", startErrorMsgContent);
+                    if (endErrorMsgContent != -1) {
+                        lexemeToHighlight = errorMessage.substring(startErrorMsgContent, endErrorMsgContent);
+                        lexemeLength = lexemeToHighlight.length();
+                    }
+                } else { // Para errores sintácticos o semánticos que usan el lexema original del token
+                     startErrorMsgContent = errorMessage.indexOf("en '"); // Error en 'val'
+                     if(startErrorMsgContent != -1) {
+                         startErrorMsgContent += "en '".length();
+                         int endErrorMsgContent = errorMessage.indexOf("'", startErrorMsgContent);
+                         if(endErrorMsgContent != -1) {
+                             lexemeToHighlight = errorMessage.substring(startErrorMsgContent, endErrorMsgContent);
+                             lexemeLength = lexemeToHighlight.length();
+                         }
+                     }
+                }
+                
+                // Si el lexer ha ajustado la columna para que el error empiece en el prefijo (ej. '4' en '4%2'),
+                // necesitamos que la columna que llega a `highlightError` ya esté ajustada.
+                // Como `Token.column` no se modifica en `addErrorToken` para la parte del prefijo,
+                // la `col` seguirá siendo la del carácter `%`.
+                // Entonces, el resaltado solo abarcará el `lexeme` del token de error (ej. `%2`).
+                // Para que el resaltado abarque "4%2", necesitaríamos que la columna original del Token.ERROR
+                // sea la del '4' y su lexema '4%2'. Esto implicaría más complejidad en el Lexer para "re-tokenizar"
+                // lo anterior como error.
+                
+                // Por ahora, resaltaremos desde la `col` recibida (que es la del inicio del error léxico como `%`)
+                // y con la longitud del `lexemeToHighlight` (que es el `errorMessage` completo como "4%2" o "cont%ador").
+                // Esto hará que el resaltado sea visualmente correcto si `col` es el inicio de `4` y `lexemeLength` la de `4%2`.
+                // Sin embargo, si `col` es la de `%` y `lexemeLength` es la de `4%2`, se resaltará desde `%` hasta el final de `2`.
+                // La solución ideal con `col` que indica `%` y `lexemeLength` de `4%2` es que el resaltado solo ocurra si `col` es el inicio real del lexema problemático.
+                // De lo contrario, visualmente quedará raro.
+
+                // Haremos un ajuste para que el resaltado siempre intente ir desde la columna del error (ej. %) y tome la longitud del mensaje extendido (ej. %2, o 4%2 si se ajusta).
+                // Pero ten en cuenta que el `col` del mensaje de error es el inicio del token de error, no necesariamente el inicio del prefijo.
+
+                highlightError(line, col, lexemeLength);
+            }
+        } catch (Exception ex) {
+            System.err.println("Error al intentar resaltar desde el mensaje: " + ex.getMessage());
+        }
+    }
+
+
+    private int getLexemeLengthFromErrorMessage(String errorMessage) {
+        // Esta función ahora se usa para determinar la longitud a resaltar.
+        // Queremos la longitud de la secuencia de caracteres reportada en el error.
+        int startQuote = errorMessage.indexOf("'");
+        if (startQuote != -1) {
+            startQuote++; // Skip the first quote
+            int endQuote = errorMessage.indexOf("'", startQuote);
+            if (endQuote != -1) {
+                return endQuote - startQuote;
+            }
+        }
+        return 1; // Default to 1 if no quoted lexeme found
+    }
+
+
     private void highlightError(int line, int col) {
-        highlightError(line, col, 1); // Resaltar un solo carácter por defecto
+        highlightError(line, col, 1);
     }
 
     private void highlightError(int line, int col, int length) {
         try {
-            // Las líneas/columnas son 1-based, JTextArea es 0-based
             int docLine = line - 1;
             int docCol = col - 1;
 
             int startOffset = inputArea.getLineStartOffset(docLine) + docCol;
             int endOffset = startOffset + length;
             
-            // Asegurarse que endOffset no exceda la longitud del texto o la línea
             if (startOffset < inputArea.getDocument().getLength()) {
                  endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
                  endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
@@ -261,11 +482,10 @@ public class SimpleCalcGUI extends JFrame {
         }
     }
 
-    // Nuevo método para cargar archivos
     private void loadFile() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setCurrentDirectory(new java.io.File(".")); // Directorio actual por defecto
-        fileChooser.setDialogTitle("Seleccionar Archivo de Código KotlinCalc");
+        fileChooser.setCurrentDirectory(new java.io.File("."));
+        fileChooser.setDialogTitle("Seleccionar Archivo de Código Kotlin");
         fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos Kotlin (*.kt, *.txt)", "kt", "txt"));
 
         int result = fileChooser.showOpenDialog(this);
@@ -288,7 +508,6 @@ public class SimpleCalcGUI extends JFrame {
         }
     }
 
-    // Nuevo método para limpiar el editor y la salida
     private void clearEditorAndOutput() {
         inputArea.setText("");
         outputArea.setText("");
@@ -298,7 +517,6 @@ public class SimpleCalcGUI extends JFrame {
     }
 
     public static void main(String[] args) {
-        // Para mejor look & feel en algunos sistemas
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {

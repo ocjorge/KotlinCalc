@@ -1,4 +1,5 @@
-// Parser.java - Convertido a sintaxis de Kotlin
+// simplecalc/Parser.java
+
 package simplecalc;
 
 import java.util.List;
@@ -33,8 +34,11 @@ public class Parser {
         }
         return errors.isEmpty();
     }
+    
+    public List<Token> getTokens() {
+        return tokens;
+    }
 
-    // Programa Kotlin: fun main() { ... }
     private void programa() {
         consume(FUN_KEYWORD, "Se esperaba 'fun' al inicio del programa.");
         consumeOptionalEOLs();
@@ -60,8 +64,10 @@ public class Parser {
         consumeOptionalEOLs();
         while (!check(LLAVE_DER) && !isAtEnd()) {
             if (peek().type == ERROR) {
-                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s. Se ignora.",
-                        peek().line, peek().column, peek().lexeme));
+                // Modificación aquí: usar errorMessage del token, si existe
+                String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
+                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
                 advance();
                 continue;
             }
@@ -99,10 +105,10 @@ public class Parser {
         } else if (check(IF_KEYWORD)) {
             System.out.println("DEBUG: sentencia: IF_KEYWORD -> if_stmt()");
             if_stmt();
-        } else if (check(WHILE_KEYWORD)) { // Nuevo: Sentencia while
+        } else if (check(WHILE_KEYWORD)) {
             System.out.println("DEBUG: sentencia: WHILE_KEYWORD -> while_stmt()");
             while_stmt();
-        } else if (check(FOR_KEYWORD)) { // Nuevo: Sentencia for
+        } else if (check(FOR_KEYWORD)) {
             System.out.println("DEBUG: sentencia: FOR_KEYWORD -> for_stmt()");
             for_stmt();
         } else if (peek().type != LLAVE_DER && peek().type != EOF && peek().type != EOL && peek().type != ERROR) {
@@ -114,12 +120,11 @@ public class Parser {
         System.out.println("DEBUG: Saliendo de sentencia(), current ahora apunta a: " + (isAtEnd() ? "EOF" : peek().type));
     }
 
-    // Declaración en Kotlin: val/var nombre: Int = valor
     private void declaracion_stmt() {
-        Token declarationType = advance(); // val o var
+        Token declarationType = advance();
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
         consume(DOS_PUNTOS, "Se esperaba ':' después del nombre de variable '" + varNameToken.lexeme + "'.");
-        consume(ID, "Se esperaba un tipo después de ':'."); // Simplificación: asume que el tipo es un ID
+        consume(ID, "Se esperaba un tipo después de ':'.");
         consume(ASIGNACION, "Se esperaba '=' después del tipo.");
         expresion_aritmetica();
 
@@ -132,7 +137,7 @@ public class Parser {
 
     private void asignacion_stmt() {
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable para la asignación.");
-        checkVariableInitialized(varNameToken); // Verificar si la variable ya fue declarada
+        checkVariableInitialized(varNameToken);
         consume(ASIGNACION, "Se esperaba '=' después del nombre de variable '" + varNameToken.lexeme + "'.");
         expresion_aritmetica();
 
@@ -142,7 +147,6 @@ public class Parser {
         consumeOptionalEOLs();
     }
 
-    // readLine() en Kotlin
     private void entrada_stmt() {
         consume(READLINE_KEYWORD, "Error interno: Se esperaba 'readLine' para entrada_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
@@ -150,7 +154,6 @@ public class Parser {
         consumeOptionalEOLs();
     }
 
-    // print() en Kotlin
     private void salida_stmt() {
         consume(PRINT_KEYWORD, "Error interno: Se esperaba 'print' para salida_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
@@ -174,7 +177,6 @@ public class Parser {
         }
     }
 
-    // if en Kotlin
     private void if_stmt() {
         consume(IF_KEYWORD, "Error interno: Se esperaba 'if' para if_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'if'.");
@@ -183,15 +185,15 @@ public class Parser {
         bloque_if();
     }
 
-    // Nuevo método para manejar el bloque del if
     private void bloque_if() {
         consume(LLAVE_IZQ, "Se esperaba '{' después de 'if (...)'.");
         consumeOptionalEOLs();
 
         while (!check(LLAVE_DER) && !isAtEnd()) {
             if (peek().type == ERROR) {
-                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s. Se ignora.",
-                        peek().line, peek().column, peek().lexeme));
+                String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
+                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
                 advance();
                 continue;
             }
@@ -207,41 +209,39 @@ public class Parser {
         consumeOptionalEOLs();
     }
 
-    // Nuevo: while en Kotlin
     private void while_stmt() {
         consume(WHILE_KEYWORD, "Se esperaba 'while'.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'while'.");
         condicion_simple();
         consume(PAREN_DER, "Se esperaba ')' después de la condición en 'while'.");
-        bloque_loop(); // Reusa el manejo de bloque para loops
+        bloque_loop();
     }
 
-    // Nuevo: for en Kotlin (simplificado para 'for varName in rangeStart..rangeEnd')
     private void for_stmt() {
         consume(FOR_KEYWORD, "Se esperaba 'for'.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'for'.");
         
         Token loopVarName = consume(ID, "Se esperaba un nombre de variable para el bucle 'for'.");
-        declaredVariables.add(loopVarName.lexeme); // Declarar la variable del bucle
+        declaredVariables.add(loopVarName.lexeme); 
 
         consume(IN_KEYWORD, "Se esperaba 'in' después del nombre de la variable en 'for'.");
-        expresion_aritmetica(); // Expresión de inicio del rango
+        expresion_aritmetica();
         consume(DOT_DOT, "Se esperaba '..' para definir el rango en el bucle 'for'.");
-        expresion_aritmetica(); // Expresión de fin del rango
+        expresion_aritmetica();
 
         consume(PAREN_DER, "Se esperaba ')' después del rango en 'for'.");
-        bloque_loop(); // Reusa el manejo de bloque para loops
+        bloque_loop();
     }
 
-    // Método para manejar los bloques de los ciclos (similar a bloque_if)
     private void bloque_loop() {
         consume(LLAVE_IZQ, "Se esperaba '{' después de la cabecera del ciclo.");
         consumeOptionalEOLs();
 
         while (!check(LLAVE_DER) && !isAtEnd()) {
             if (peek().type == ERROR) {
-                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s. Se ignora.",
-                        peek().line, peek().column, peek().lexeme));
+                String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
+                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
                 advance();
                 continue;
             }
@@ -286,24 +286,8 @@ public class Parser {
         }
     }
 
-    //ESTE METODO NO ESTOY SEGURO SI FUNCIONA O NO (anteriormente para accion_unica_if)
-    private void accion_unica_if() {
-        if (check(PRINT_KEYWORD)) {
-            consume(PRINT_KEYWORD, "");
-            consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
-            valor_salida();
-            consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'.");
-        } else if (check(ID) && (current + 1 < tokens.size() && tokens.get(current + 1).type == ASIGNACION)) {
-            asignacion_stmt();
-        } else {
-            error(peek(), "Acción inválida después de 'if (...)'.",
-                    "Se esperaba una sentencia 'print(...)' o una asignación 'variable = ...'.");
-        }
-    }
-
     private void consumeOptionalEOLs() {
         while (match(EOL)) {
-            // Seguir consumiendo EOLs
         }
     }
 
@@ -337,10 +321,8 @@ public class Parser {
         } else if (check(NUMERO_ENTERO)) {
             consume(NUMERO_ENTERO, "");
         } else if (check(CADENA_LITERAL)) {
-            // Soporte para cadenas literales en expresiones
             consume(CADENA_LITERAL, "");
         } else if (check(READLINE_KEYWORD)) {
-            // Manejo de readLine() como parte de una expresión
             consume(READLINE_KEYWORD, "");
             consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
             consume(PAREN_DER, "Se esperaba ')' después de '('.");
@@ -354,7 +336,6 @@ public class Parser {
         }
     }
 
-    // ---- Métodos de ayuda del Parser ----
     private Token consume(Token.TokenType type, String message) {
         if (peek().type == EOL && type != EOL && type != EOF) {
             throw error(peek(), "Salto de línea inesperado.",
@@ -459,14 +440,13 @@ public class Parser {
                 case READLINE_KEYWORD:
                 case PRINT_KEYWORD:
                 case IF_KEYWORD:
-                case WHILE_KEYWORD: // Añadido
-                case FOR_KEYWORD:   // Añadido
+                case WHILE_KEYWORD:
+                case FOR_KEYWORD:
                 case LLAVE_DER:
                 case EOF:
                     System.out.println("DEBUG: synchronize: encontrado " + peek().type + ". Retornando.");
                     return;
                 default:
-                // Sigue avanzando
             }
             System.out.println("DEBUG: synchronize: avanzando desde " + peek().type);
             advance();
