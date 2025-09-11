@@ -2,6 +2,8 @@
 Orozco Reyes Hiram
 Ortiz Ceballso Jorge
 Salgado Rojas Marelin Iral
+
+Lenguajes Automatas II
 */
 
 package simplecalc;
@@ -20,6 +22,7 @@ public class Main {
                 
 
         SwingUtilities.invokeLater(new Runnable() {
+            
             @Override
             public void run() {
                 new SimpleCalcGUI().setVisible(true);
