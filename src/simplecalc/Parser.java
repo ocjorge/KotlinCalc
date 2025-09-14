@@ -154,21 +154,21 @@ public class Parser {
     }
 
     private void salida_stmt() {
-        consume(PRINT_KEYWORD, "Se esperaba 'print' al inicio de la sentencia de salida."); // Mensaje más descriptivo
+        consume(PRINT_KEYWORD, "Se esperaba 'print' al inicio de la sentencia de salida.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
         valor_salida();
-        consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'.");
+        // Aquí es donde ajustamos el mensaje si el PAREN_DER falta y hay un EOL.
+        consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'."); 
         consumeOptionalEOLs();
     }
 
     private void valor_salida() {
-        // Manejo de token ERROR léxico dentro de print
         if (check(ERROR)) {
             String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
             error(peek(), "Valor inválido para 'print'.",
                     "Cadena literal mal formada o incompleta: " + lexerErrorMessage);
             advance(); // Consumir el token de ERROR para seguir el parseo
-            return; // Salir para evitar que intente procesar la cadena incompleta como ID/NUMERO/CADENA
+            return; 
         }
         
         if (check(ID)) {
@@ -370,30 +370,32 @@ public class Parser {
             String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
             errors.add(String.format("[Línea %d, Col %d] Error léxico: %s (token ignorado para análisis sintáctico)",
                     peek().line, peek().column, lexerErrorMessage));
-            advance(); // Consumir el token de error léxico para que el parser no lo vea
-            // Después de consumir el error léxico, intentamos ver si el siguiente token es el esperado.
-            // Esto es una forma básica de "panic mode" recovery.
-            if (check(type)) {
+            advance(); // Consumir el token de error léxico
+            if (check(type)) { // Intentar ver si el siguiente token es el esperado
                 return advance();
             }
             // Si incluso después de recuperar, no encontramos el token esperado, lanzamos un error sintáctico.
-            throw error(previous(), message, message); // Usar previous() porque advance() ya se ejecutó
+            // Usamos peek() porque advance() ya se ejecutó si el ERROR fue consumido.
+            // Este error sintáctico será un error secundario debido al error léxico.
+            throw error(peek(), message, message); 
         }
         
         // Manejo específico para el EOL inesperado antes del token esperado
+        // Si el EOL es el problema, pero esperamos algo más crucial (como PAREN_DER),
+        // priorizamos el mensaje de lo esperado.
         if (peek().type == EOL && type != EOL && type != EOF) {
-            // Si el EOL es el problema, lanzamos un error sobre el EOL, no sobre el 'type' esperado.
-            throw error(peek(), "Salto de línea inesperado.",
-                    "Se esperaba '" + type + "' para continuar/terminar la sentencia, pero se encontró un salto de línea. " + message);
+            // No lanzamos un error sobre el EOL directamente aquí, sino que permitimos
+            // que la siguiente comprobación `check(type)` falle y use el `message` proporcionado.
+            // Esto asegura que el mensaje "Se esperaba ')' para cerrar 'print'." tenga prioridad.
         }
         
         if (check(type)) {
             return advance();
         }
         
-        // Si no se encontró el tipo esperado, generamos el error con el mensaje genérico.
-        // Aquí previous() podría ser el último token válido o el EOL que fue consumido por match.
-        throw error(peek(), message, message); // Usa peek() para indicar el token inesperado
+        // Si no se encontró el tipo esperado (y no fue un ERROR léxico ni un EOL prioritario),
+        // generamos el error con el mensaje proporcionado.
+        throw error(peek(), message, message); 
     }
 
     private SyntaxError error(Token token, String generalMessage, String specificMessageToUser) {
