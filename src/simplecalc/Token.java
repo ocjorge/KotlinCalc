@@ -1,9 +1,8 @@
-// simplecalc/Token.java
-
 package simplecalc;
 
 public class Token {
     public enum TokenType {
+        // ... (todos tus tipos de token existentes)
         FUN_KEYWORD, VAL_KEYWORD, VAR_KEYWORD, IF_KEYWORD, PRINT_KEYWORD, READLINE_KEYWORD,
         WHILE_KEYWORD, FOR_KEYWORD, IN_KEYWORD,
         
@@ -54,8 +53,16 @@ public class Token {
     @Override
     public String toString() {
         String literalStr = (literal != null) ? literal.toString() : "";
-        String displayLexeme = (type == TokenType.ERROR && errorMessage != null) ? 
-                               "'" + lexeme + "' (" + errorMessage + ")" : lexeme; // Mostrar lexema original y error para ERROR tokens
+        // Para ERROR tokens, incluimos el lexema original y el errorMessage para claridad en la tabla
+        String displayLexeme;
+        if (type == TokenType.ERROR) {
+            displayLexeme = "'" + lexeme + "'"; // Mostrar el lexema real del token de error
+            if (errorMessage != null) {
+                displayLexeme += " (" + errorMessage + ")"; // Añadir el mensaje de error contextual
+            }
+        } else {
+            displayLexeme = lexeme;
+        }
         
         return String.format("| %-25s | %-20s | %-15s | %4d | %4d |",
                 type, displayLexeme, literalStr, line, column);

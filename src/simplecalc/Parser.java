@@ -1,11 +1,11 @@
-// simplecalc/Parser.java
-
 package simplecalc;
 
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 import static simplecalc.Token.TokenType.*;
 
 public class Parser {
@@ -14,6 +14,7 @@ public class Parser {
     private int current = 0;
     private List<String> errors = new ArrayList<>();
     private Set<String> declaredVariables = new HashSet<>();
+    private Map<String, String> variableTypes = new HashMap<>(); // Variable name -> Type String ("Int", "String")
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -27,6 +28,7 @@ public class Parser {
         current = 0;
         errors.clear();
         declaredVariables.clear();
+        variableTypes.clear(); 
         try {
             programa();
         } catch (SyntaxError | SemanticError e) {
@@ -65,7 +67,7 @@ public class Parser {
         while (!check(LLAVE_DER) && !isAtEnd()) {
             if (peek().type == ERROR) {
                 String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
-                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s (token ignorado)", // Añadido (token ignorado)
+                errors.add(String.format("[Línea %d, Col %d] Error léxico: %s (token ignorado)",
                         peek().line, peek().column, lexerErrorMessage));
                 advance();
                 continue;
@@ -120,16 +122,33 @@ public class Parser {
     }
 
     private void declaracion_stmt() {
-        Token declarationType = advance();
+        Token declarationType = advance(); // VAL_KEYWORD o VAR_KEYWORD
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
-        consume(DOS_PUNTOS, "Se esperaba ':' después del nombre de variable '" + varNameToken.lexeme + "'.");
-        consume(ID, "Se esperaba un tipo después de ':'.");
-        consume(ASIGNACION, "Se esperaba '=' después del tipo.");
-        expresion_aritmetica();
+        
+        // Verificar si la variable ya fue declarada
+        if (declaredVariables.contains(varNameToken.lexeme)) {
+             semanticError(varNameToken, "Redeclaración de variable.",
+                           "La variable '" + varNameToken.lexeme + "' ya ha sido declarada.");
+        }
 
-        System.out.println("DEBUG declaracion_stmt: Declarando variable: " + varNameToken.lexeme);
+        consume(DOS_PUNTOS, "Se esperaba ':' después del nombre de variable '" + varNameToken.lexeme + "'.");
+        
+        Token typeToken = consume(ID, "Se esperaba un tipo (ej. 'Int', 'String') después de ':'.");
+        if (!isValidType(typeToken.lexeme)) {
+            semanticError(typeToken, "Tipo de dato no reconocido: '" + typeToken.lexeme + "'.",
+                          "Se esperaba un tipo de dato válido como 'Int' o 'String'.");
+        }
+
+        consume(ASIGNACION, "Se esperaba '=' después del tipo '" + typeToken.lexeme + "'.");
+        
+        String declaredType = typeToken.lexeme;
+        String assignedExpressionType = expresion_aritmetica(); // Parsear y obtener el tipo de la expresión
+
+        checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
+
         declaredVariables.add(varNameToken.lexeme);
-        System.out.println("DEBUG declaracion_stmt: declaredVariables: " + declaredVariables);
+        variableTypes.put(varNameToken.lexeme, declaredType);
+        System.out.println("DEBUG declaracion_stmt: Declarando variable: " + varNameToken.lexeme + " de tipo: " + declaredType);
 
         consumeOptionalEOLs();
     }
@@ -137,11 +156,21 @@ public class Parser {
     private void asignacion_stmt() {
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable para la asignación.");
         checkVariableInitialized(varNameToken);
-        consume(ASIGNACION, "Se esperaba '=' después del nombre de variable '" + varNameToken.lexeme + "'.");
-        expresion_aritmetica();
 
-        System.out.println("DEBUG asignacion_stmt: Asignando a variable: " + varNameToken.lexeme);
-        System.out.println("DEBUG asignacion_stmt: declaredVariables: " + declaredVariables);
+        String declaredType = variableTypes.get(varNameToken.lexeme);
+        if (declaredType == null) { 
+             semanticError(varNameToken, "Error interno: Tipo de variable no encontrado.",
+                           "La variable '" + varNameToken.lexeme + "' no tiene un tipo asignado.");
+             declaredType = "Unknown";
+        }
+
+        consume(ASIGNACION, "Se esperaba '=' después del nombre de variable '" + varNameToken.lexeme + "'.");
+        
+        String assignedExpressionType = expresion_aritmetica(); // Parsear y obtener el tipo de la expresión
+
+        checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
+
+        System.out.println("DEBUG asignacion_stmt: Asignando a variable: " + varNameToken.lexeme + " con tipo: " + assignedExpressionType);
 
         consumeOptionalEOLs();
     }
@@ -156,33 +185,9 @@ public class Parser {
     private void salida_stmt() {
         consume(PRINT_KEYWORD, "Se esperaba 'print' al inicio de la sentencia de salida.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
-        valor_salida();
-        // Aquí es donde ajustamos el mensaje si el PAREN_DER falta y hay un EOL.
+        expresion_aritmetica(); // print toma una expresión, no solo un valor_salida simple
         consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'."); 
         consumeOptionalEOLs();
-    }
-
-    private void valor_salida() {
-        if (check(ERROR)) {
-            String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
-            error(peek(), "Valor inválido para 'print'.",
-                    "Cadena literal mal formada o incompleta: " + lexerErrorMessage);
-            advance(); // Consumir el token de ERROR para seguir el parseo
-            return; 
-        }
-        
-        if (check(ID)) {
-            Token idToken = peek();
-            checkVariableInitialized(idToken);
-            consume(ID, "");
-        } else if (check(NUMERO_ENTERO)) {
-            consume(NUMERO_ENTERO, "");
-        } else if (check(CADENA_LITERAL)) {
-            consume(CADENA_LITERAL, "");
-        } else {
-            error(peek(), "Valor inválido para 'print'.",
-                    "Se esperaba un ID, un número entero o una cadena literal dentro de 'print()'.");
-        }
     }
 
     private void if_stmt() {
@@ -230,12 +235,24 @@ public class Parser {
         consume(PAREN_IZQ, "Se esperaba '(' después de 'for'.");
         
         Token loopVarName = consume(ID, "Se esperaba un nombre de variable para el bucle 'for'.");
+        if (declaredVariables.contains(loopVarName.lexeme)) {
+             semanticError(loopVarName, "Redeclaración de variable.",
+                           "La variable '" + loopVarName.lexeme + "' ya ha sido declarada.");
+        }
         declaredVariables.add(loopVarName.lexeme); 
+        variableTypes.put(loopVarName.lexeme, "Int"); 
+        System.out.println("DEBUG for_stmt: Declarando variable de bucle: " + loopVarName.lexeme + " de tipo: Int");
+
 
         consume(IN_KEYWORD, "Se esperaba 'in' después del nombre de la variable en 'for'.");
-        expresion_aritmetica();
+        
+        String rangeStartType = expresion_aritmetica(); 
+        checkTypeCompatibility("Int", rangeStartType, previous());
+        
         consume(DOT_DOT, "Se esperaba '..' para definir el rango en el bucle 'for'.");
-        expresion_aritmetica();
+        
+        String rangeEndType = expresion_aritmetica(); 
+        checkTypeCompatibility("Int", rangeEndType, previous());
 
         consume(PAREN_DER, "Se esperaba ')' después del rango en 'for'.");
         bloque_loop();
@@ -266,34 +283,33 @@ public class Parser {
     }
 
 
-    private void condicion_simple() {
-        operando_condicion();
-        operador_relacional();
-        operando_condicion();
-    }
+     private void condicion_simple() {
+        // Parsear el primer operando
+        String leftOperandType = expresion_aritmetica(); // Esto debería parsear "contador"
 
-    private void operando_condicion() {
-        // Manejo de token ERROR léxico dentro de una condición
-        if (check(ERROR)) {
-            String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
-            error(peek(), "Operando inválido en condición.",
-                    "Secuencia inválida encontrada: " + lexerErrorMessage);
-            advance(); // Consumir el token de ERROR
-            return;
+        // Consumir el operador relacional y guardarlo
+        // operador_relacional() llamará a advance()
+        Token operatorToken = peek(); // Obtener el token del operador antes de consumirlo
+        operador_relacional(); // Esto consume '<'
+
+        // Parsear el segundo operando
+        String rightOperandType = expresion_aritmetica(); // Esto debería parsear "3"
+
+        // Semántico: Verificar compatibilidad de tipos en la condición
+        if (!leftOperandType.equals("Unknown") && !rightOperandType.equals("Unknown") &&
+            !leftOperandType.equals("ErrorType") && !rightOperandType.equals("ErrorType")) {
+            
+            if (!leftOperandType.equals(rightOperandType)) {
+                semanticError(operatorToken, "Incompatibilidad de tipos en la condición.", // Usar operatorToken
+                              "No se puede comparar un tipo '" + leftOperandType + "' con un tipo '" + rightOperandType + "'.");
+            }
+            if (!leftOperandType.equals("Int") && !leftOperandType.equals("String")) { 
+                 semanticError(operatorToken, "Tipo de dato no comparable.", // Usar operatorToken
+                               "Las comparaciones solo están permitidas para tipos 'Int' o 'String'. Tipo encontrado: '" + leftOperandType + "'.");
+            }
         }
-
-        if (check(ID)) {
-            Token idToken = peek();
-            checkVariableInitialized(idToken);
-            consume(ID, "");
-        } else if (check(NUMERO_ENTERO)) {
-            consume(NUMERO_ENTERO, "");
-        } else {
-            error(peek(), "Operando inválido en condición.",
-                    "Se esperaba un ID o un número entero en la condición.");
-        }
     }
-
+    
     private void operador_relacional() {
         if (check(OP_MENOR) || check(OP_MAYOR) || check(OP_IGUAL_IGUAL)) {
             advance();
@@ -307,95 +323,124 @@ public class Parser {
         while (match(EOL)) {
         }
     }
-
-    private void expresion_aritmetica() {
-        termino();
+    
+    // MODIFICADO: expresion_aritmetica ahora devuelve el tipo de la expresión
+    private String expresion_aritmetica() {
+        String type = termino();
         while (match(OP_SUMA, OP_RESTA)) {
-            if (peek().type == EOL) {
-                throw error(peek(), "Expresión incompleta antes de salto de línea.",
-                        "Se esperaba un operando después de '" + previous().lexeme + "' pero se encontró un salto de línea.");
+            Token operator = previous(); // Operador actual
+            // Consumir el operador relacional si existe antes de evaluar el termino.
+            if(operator.type == OP_MENOR || operator.type == OP_MAYOR || operator.type == OP_IGUAL_IGUAL) {
+                // Este caso solo debería ocurrir en condicion_simple y ya lo maneja
+                // Si llegamos aquí, es un error sintáctico porque un operador relacional no va en una expresión aritmética.
+                 semanticError(operator, "Operador relacional inesperado en expresión aritmética.",
+                               "Se esperaba un operador aritmético (+, -) pero se encontró un operador relacional.");
+                 type = "ErrorType";
+                 // No avanzamos, dejamos que el parseo continúe con el término
             }
-            termino();
+            
+            String rightType = termino();
+
+            if (type.equals("Unknown") || rightType.equals("Unknown")) {
+                type = "Unknown";
+            } else if (type.equals("ErrorType") || rightType.equals("ErrorType")) {
+                type = "ErrorType"; // Propagar el error de tipo
+            } else if (type.equals("Int") && rightType.equals("Int")) {
+                type = "Int";
+            } else if (type.equals("String") && rightType.equals("String") && operator.type == OP_SUMA) {
+                type = "String"; // Concatenación de cadenas
+            } else {
+                semanticError(operator, "Incompatibilidad de tipos en operación.",
+                              "Operación '" + operator.lexeme + "' entre '" + type + "' y '" + rightType + "' no permitida.");
+                type = "ErrorType";
+            }
         }
+        return type;
     }
 
-    private void termino() {
-        factor();
+    // MODIFICADO: termino ahora devuelve el tipo del término
+    private String termino() {
+        String type = factor();
         while (match(OP_MULT, OP_DIV)) {
-            if (peek().type == EOL) {
-                throw error(peek(), "Expresión incompleta antes de salto de línea.",
-                        "Se esperaba un operando después de '" + previous().lexeme + "' pero se encontró un salto de línea.");
+            Token operator = previous(); // Operador actual
+            String rightType = factor();
+
+            if (type.equals("Unknown") || rightType.equals("Unknown")) {
+                type = "Unknown";
+            } else if (type.equals("ErrorType") || rightType.equals("ErrorType")) {
+                type = "ErrorType";
+            } else if (type.equals("Int") && rightType.equals("Int")) {
+                type = "Int";
+            } else {
+                semanticError(operator, "Incompatibilidad de tipos en operación.",
+                              "Operación '" + operator.lexeme + "' entre '" + type + "' y '" + rightType + "' no permitida.");
+                type = "ErrorType";
             }
-            factor();
         }
+        return type;
     }
 
-    private void factor() {
-        // Manejo de token ERROR léxico dentro de una expresión aritmética
+    // MODIFICADO: factor ahora devuelve el tipo del factor
+    private String factor() {
         if (check(ERROR)) {
             String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
             error(peek(), "Expresión aritmética malformada.",
                     "Cadena literal o secuencia inválida: " + lexerErrorMessage);
-            advance(); // Consumir el token de ERROR
-            return;
+            advance();
+            return "Unknown"; // Si hay error léxico, el tipo es desconocido
         }
 
+        String type = "Unknown";
         if (check(ID)) {
             Token idToken = peek();
-            checkVariableInitialized(idToken);
+            checkVariableInitialized(idToken); // Semántico: Verificar que la variable está declarada
+            type = variableTypes.get(idToken.lexeme); // Obtener el tipo de la variable
+            if (type == null) type = "Unknown"; 
             consume(ID, "");
         } else if (check(NUMERO_ENTERO)) {
+            type = "Int";
             consume(NUMERO_ENTERO, "");
         } else if (check(CADENA_LITERAL)) {
+            type = "String";
             consume(CADENA_LITERAL, "");
         } else if (check(READLINE_KEYWORD)) {
+            type = "String"; // readLine() siempre devuelve String
             consume(READLINE_KEYWORD, "");
             consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
             consume(PAREN_DER, "Se esperaba ')' después de '('.");
         } else if (check(PAREN_IZQ)) {
             consume(PAREN_IZQ, "");
-            expresion_aritmetica();
+            type = expresion_aritmetica(); // Recursivamente obtener el tipo de la subexpresión
             consume(PAREN_DER, "Se esperaba ')' para cerrar la expresión entre paréntesis.");
         } else {
             error(peek(), "Expresión aritmética malformada.",
                     "Se esperaba un ID, un número, una cadena literal, readLine(), o una expresión entre paréntesis '(...)'.");
+            type = "Unknown";
         }
+        return type;
     }
 
     private Token consume(Token.TokenType type, String message) {
-        // Lógica de recuperación de errores: Si el token actual es un ERROR léxico
-        // y NO es el tipo de token que esperamos, lo reportamos y avanzamos.
-        // Esto evita que un error léxico cause múltiples errores sintácticos en cascada.
         if (peek().type == ERROR && type != ERROR) {
             String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
             errors.add(String.format("[Línea %d, Col %d] Error léxico: %s (token ignorado para análisis sintáctico)",
                     peek().line, peek().column, lexerErrorMessage));
-            advance(); // Consumir el token de error léxico
-            if (check(type)) { // Intentar ver si el siguiente token es el esperado
+            advance();
+            if (check(type)) {
                 return advance();
             }
-            // Si incluso después de recuperar, no encontramos el token esperado, lanzamos un error sintáctico.
-            // Usamos peek() porque advance() ya se ejecutó si el ERROR fue consumido.
-            // Este error sintáctico será un error secundario debido al error léxico.
-            throw error(peek(), message, message); 
+            throw error(peek(), message, message);
         }
         
-        // Manejo específico para el EOL inesperado antes del token esperado
-        // Si el EOL es el problema, pero esperamos algo más crucial (como PAREN_DER),
-        // priorizamos el mensaje de lo esperado.
         if (peek().type == EOL && type != EOL && type != EOF) {
-            // No lanzamos un error sobre el EOL directamente aquí, sino que permitimos
-            // que la siguiente comprobación `check(type)` falle y use el `message` proporcionado.
-            // Esto asegura que el mensaje "Se esperaba ')' para cerrar 'print'." tenga prioridad.
+            throw error(peek(), message, message);
         }
         
         if (check(type)) {
             return advance();
         }
         
-        // Si no se encontró el tipo esperado (y no fue un ERROR léxico ni un EOL prioritario),
-        // generamos el error con el mensaje proporcionado.
-        throw error(peek(), message, message); 
+        throw error(peek(), message, message);
     }
 
     private SyntaxError error(Token token, String generalMessage, String specificMessageToUser) {
@@ -462,6 +507,21 @@ public class Parser {
             throw semanticError(name,
                     "Variable no inicializada: " + name.lexeme,
                     "La variable '" + name.lexeme + "' se usa antes de declararla.");
+        }
+    }
+    
+    private boolean isValidType(String typeName) {
+        return typeName.equals("Int") || typeName.equals("String");
+    }
+
+    private void checkTypeCompatibility(String expectedType, String actualType, Token problemToken) {
+        if (expectedType.equals("Unknown") || actualType.equals("Unknown") || actualType.equals("ErrorType")) {
+            return; 
+        }
+        
+        if (!expectedType.equals(actualType)) {
+            throw semanticError(problemToken, "Incompatibilidad de tipos en asignación.",
+                                "Se esperaba un valor de tipo '" + expectedType + "' pero se encontró un tipo '" + actualType + "'.");
         }
     }
 

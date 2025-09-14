@@ -147,50 +147,38 @@ public class Lexer {
         }
     }
     
-     private void string() {
-        // Guardar la línea y columna inicial del token para el error si ocurre
+    private void string() {
         int currentTokenLine = line;
         int currentTokenCol = calculateColumnForCurrentPos(start);
 
-        // Consumir caracteres hasta la comilla de cierre o el final de la entrada
         while (peekLexerChar() != '"' && !isAtLexerEnd()) {
             char peeked = peekLexerChar();
             if (peeked == '\n' || peeked == '\r') {
-                // Si encontramos un salto de línea *dentro* de la cadena (antes de la comilla de cierre)
-                // Esto es un error.
-                String partialStringLexeme = source.substring(start, current); // Incluye la comilla inicial
+                String partialStringLexeme = source.substring(start, current);
                 tokens.add(new Token(Token.TokenType.ERROR, partialStringLexeme, null, 
                                      currentTokenLine, currentTokenCol, 
                                      "Salto de línea o retorno de carro no permitido en cadena literal."));
                 
-                // Consumir el resto de la línea para evitar más errores léxicos en cascada
                 while (!isAtLexerEnd() && peekLexerChar() != '\n' && peekLexerChar() != '\r') {
                     advanceLexerChar();
                 }
-                return; // Salir de la función string()
+                return;
             }
             advanceLexerChar();
         }
 
-        // Después del bucle, si `isAtLexerEnd()` es true, significa que la cadena no se cerró.
         if (isAtLexerEnd()) {
-            // Error: Cadena literal no terminada (llegó al final del archivo/entrada o final de línea)
-            // El lexema del error es la cadena parcial (incluyendo la comilla inicial)
             String partialStringLexeme = source.substring(start, current);
             tokens.add(new Token(Token.TokenType.ERROR, partialStringLexeme, null, 
                                  currentTokenLine, currentTokenCol, 
                                  "Cadena literal no terminada."));
-            return; // Salir de la función string()
+            return;
         }
         
-        // Si llegamos aquí, hemos encontrado la comilla de cierre
-        advanceLexerChar(); // Consumir la comilla de cierre
-        String value = source.substring(start + 1, current - 1); // El valor sin las comillas
+        advanceLexerChar();
+        String value = source.substring(start + 1, current - 1);
         addToken(Token.TokenType.CADENA_LITERAL, value);
     }
-
-
-    // --- Métodos de ayuda del Lexer ---
 
     private boolean isAtLexerEnd() {
         return current >= source.length();
@@ -233,15 +221,13 @@ public class Lexer {
         tokens.add(new Token(type, text, literal, line, calculateColumnForCurrentPos(start)));
     }
     
-    // Método para agregar errores léxicos simples sin contexto especial
     private void addErrorTokenSimple(String message) {
         String problematicLexeme = source.substring(start, current);
-        tokens.add(new Token(Token.TokenType.ERROR, problematicLexeme, // Lexema es la parte problemática
+        tokens.add(new Token(Token.TokenType.ERROR, problematicLexeme, 
                              null, line, calculateColumnForCurrentPos(start),
-                             message)); // El mensaje es el que se pasa
+                             message));
     }
 
-    // Método principal para agregar errores léxicos, intentando incluir el contexto
     private void addErrorToken(String problematicSubstring, String formatMessage) {
         String contextualLexeme = problematicSubstring;
         int errorColumn = calculateColumnForCurrentPos(start);
