@@ -64,10 +64,10 @@ public class Parser {
         consumeOptionalEOLs();
         while (!check(LLAVE_DER) && !isAtEnd()) {
             if (peek().type == ERROR) {
-                // Modificación aquí: usar errorMessage del token, si existe
+                // Utiliza el errorMessage almacenado en el token, si está disponible.
                 String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
                 errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
-                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
+                        peek().line, peek().column, lexerErrorMessage));
                 advance();
                 continue;
             }
@@ -163,6 +163,15 @@ public class Parser {
     }
 
     private void valor_salida() {
+        // Añadir una verificación de ERROR token aquí también
+        if (check(ERROR)) {
+            String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+            error(peek(), "Valor inválido para 'print'.",
+                    "Cadena literal mal formada o incompleta: " + lexerErrorMessage);
+            advance(); // Consumir el token de ERROR para seguir
+            return; // Salir para evitar más errores por la misma cadena
+        }
+        
         if (check(ID)) {
             Token idToken = peek();
             checkVariableInitialized(idToken);
@@ -193,7 +202,7 @@ public class Parser {
             if (peek().type == ERROR) {
                 String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
                 errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
-                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
+                        peek().line, peek().column, lexerErrorMessage));
                 advance();
                 continue;
             }
@@ -241,7 +250,7 @@ public class Parser {
             if (peek().type == ERROR) {
                 String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
                 errors.add(String.format("[Línea %d, Col %d] Error léxico: %s",
-                        peek().line, peek().column, lexerErrorMessage)); // Eliminado "Se ignora."
+                        peek().line, peek().column, lexerErrorMessage));
                 advance();
                 continue;
             }
@@ -314,6 +323,15 @@ public class Parser {
     }
 
     private void factor() {
+        // Añadir una verificación de ERROR token aquí también
+        if (check(ERROR)) {
+            String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+            error(peek(), "Expresión aritmética malformada.",
+                    "Cadena literal o secuencia inválida: " + lexerErrorMessage);
+            advance(); // Consumir el token de ERROR para seguir
+            return; // Salir para evitar más errores por la misma cadena
+        }
+
         if (check(ID)) {
             Token idToken = peek();
             checkVariableInitialized(idToken);
@@ -337,6 +355,21 @@ public class Parser {
     }
 
     private Token consume(Token.TokenType type, String message) {
+        // Si el token actual es un ERROR léxico y no esperamos específicamente un ERROR token,
+        // lo reportamos y luego intentamos avanzar para recuperarnos.
+        if (peek().type == ERROR && type != ERROR) {
+            String lexerErrorMessage = peek().errorMessage != null ? peek().errorMessage : peek().lexeme + " (Caracter inesperado)";
+            errors.add(String.format("[Línea %d, Col %d] Error léxico: %s (se ignora para análisis sintáctico)",
+                    peek().line, peek().column, lexerErrorMessage));
+            advance(); // Consumir el token de error léxico
+            // Después de consumir el error, intentamos ver si el siguiente token es el esperado
+            if (check(type)) {
+                return advance();
+            }
+            // Si incluso después de recuperar, no encontramos el token esperado, lanzamos un error sintáctico.
+            throw error(peek(), message, message);
+        }
+        
         if (peek().type == EOL && type != EOL && type != EOF) {
             throw error(peek(), "Salto de línea inesperado.",
                     "Se esperaba '" + type + "' para continuar/terminar la sentencia, pero se encontró un salto de línea. " + message);
