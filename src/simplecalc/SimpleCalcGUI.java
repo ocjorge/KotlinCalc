@@ -384,30 +384,13 @@ public class SimpleCalcGUI extends JFrame {
             if (errorMessage.startsWith("[")) {
                 String locationPart = errorMessage.substring(1, errorMessage.indexOf("]"));
                 String[] parts = locationPart.split(",");
+                // CORRECCIÓN: Acceder a los elementos del arreglo y aplicar replace
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
                 
-                // Intentar extraer el lexema a resaltar del mensaje completo.
-                // Esto es crucial para que el resaltado sea preciso.
                 String lexemeToHighlight = "";
                 int lexemeLength = 1;
                 
-                // Prioridad 1: Mensaje de error léxico con formato de secuencia inesperada
-                int startSeqUnexpected = errorMessage.indexOf("Secuencia de caracteres inesperada: '");
-                if (startSeqUnexpected != -1) {
-                    startSeqUnexpected += "Secuencia de caracteres inesperada: '".length();
-                    int endSeqUnexpected = errorMessage.indexOf("'", startSeqUnexpected);
-                    if (endSeqUnexpected != -1) {
-                        lexemeToHighlight = errorMessage.substring(startSeqUnexpected, endSeqUnexpected);
-                        lexemeLength = lexemeToHighlight.length();
-                        // La columna para este tipo de error ya se ajustó en el Lexer si había un prefijo.
-                        // Así que 'col' ya debería ser el inicio de "4%2" o "cont%ador".
-                        highlightError(line, col, lexemeLength);
-                        return;
-                    }
-                }
-                
-                // Prioridad 2: Mensajes de error léxico de cadena literal mal formada (ej. "Cadena literal no terminada.")
                 int startLexicalError = errorMessage.indexOf("Error Léxico: '");
                 if (startLexicalError != -1) {
                     startLexicalError += "Error Léxico: '".length();
@@ -419,8 +402,7 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-
-                // Prioridad 3: Errores sintácticos o semánticos que citan un token ('Error en 'X'')
+                
                 int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
                 if (startSyntaxSemanticError != -1) {
                      startSyntaxSemanticError += "Error en '".length();
@@ -433,7 +415,6 @@ public class SimpleCalcGUI extends JFrame {
                      }
                 }
                 
-                // Si no se pudo extraer un lexema específico con longitud, resaltamos 1 caracter en la columna reportada.
                 highlightError(line, col, 1);
 
             }
@@ -441,10 +422,6 @@ public class SimpleCalcGUI extends JFrame {
             System.err.println("Error al intentar resaltar desde el mensaje: " + ex.getMessage());
         }
     }
-
-
-    // El método getLexemeLengthFromErrorMessage ahora está integrado en highlightErrorFromMessage
-    // o se basa en la lógica que extrae el lexema del mensaje de error directamente.
 
     private void highlightError(int line, int col) {
         highlightError(line, col, 1);
@@ -508,18 +485,4 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLACK);
     }
 
-    public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new SimpleCalcGUI().setVisible(true);
-            }
-        });
-    }
 }
