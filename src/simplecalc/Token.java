@@ -1,10 +1,8 @@
-// simplecalc/Token.java
-
 package simplecalc;
 
 public class Token {
     public enum TokenType {
-        // ... (Todos tus tipos de token existentes)
+        // ... (todos tus tipos de token existentes)
         FUN_KEYWORD, VAL_KEYWORD, VAR_KEYWORD, IF_KEYWORD, PRINT_KEYWORD, READLINE_KEYWORD,
         WHILE_KEYWORD, FOR_KEYWORD, IN_KEYWORD,
         
@@ -32,34 +30,39 @@ public class Token {
     public final Object literal;
     public final int line;
     public final int column;
-    // NUEVO: Campo para el mensaje de error cuando el tipo es ERROR
     public final String errorMessage; 
     
-    // Constructor para tokens normales
     public Token(TokenType type, String lexeme, Object literal, int line, int column) {
         this.type = type;
         this.lexeme = lexeme;
         this.literal = literal;
         this.line = line;
         this.column = column;
-        this.errorMessage = null; // No hay mensaje de error para tokens normales
+        this.errorMessage = null; 
     }
 
-    // NUEVO: Constructor para tokens de ERROR con mensaje personalizado
     public Token(TokenType type, String lexeme, Object literal, int line, int column, String errorMessage) {
         this.type = type;
         this.lexeme = lexeme;
         this.literal = literal;
         this.line = line;
         this.column = column;
-        this.errorMessage = errorMessage; // Almacena el mensaje extendido
+        this.errorMessage = errorMessage; 
     }
     
     @Override
     public String toString() {
         String literalStr = (literal != null) ? literal.toString() : "";
-        // Si es un token de ERROR, muestra el mensaje extendido en lugar del lexema directo
-        String displayLexeme = (type == TokenType.ERROR && errorMessage != null) ? errorMessage : lexeme;
+        // Para ERROR tokens, incluimos el lexema original y el errorMessage para claridad en la tabla
+        String displayLexeme;
+        if (type == TokenType.ERROR) {
+            displayLexeme = "'" + lexeme + "'"; // Mostrar el lexema real del token de error
+            if (errorMessage != null) {
+                displayLexeme += " (" + errorMessage + ")"; // Añadir el mensaje de error contextual
+            }
+        } else {
+            displayLexeme = lexeme;
+        }
         
         return String.format("| %-25s | %-20s | %-15s | %4d | %4d |",
                 type, displayLexeme, literalStr, line, column);

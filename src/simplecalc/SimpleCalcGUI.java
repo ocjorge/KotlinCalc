@@ -1,10 +1,8 @@
-// simplecalc/SimpleCalcGUI.java
-
 package simplecalc;
 
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultHighlighter; // Asegúrate de que esta importación esté presente
+import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -26,8 +24,7 @@ public class SimpleCalcGUI extends JFrame {
         setLocationRelativeTo(null);
 
         initComponents();
-        // CORRECCIÓN AQUÍ:
-        errorPainter = new DefaultHighlighter.DefaultHighlightPainter(Color.PINK); 
+        errorPainter = new DefaultHighlighter.DefaultHighlightPainter(Color.PINK);
     }
 
     private void initComponents() {
@@ -385,74 +382,44 @@ public class SimpleCalcGUI extends JFrame {
             if (errorMessage.startsWith("[")) {
                 String locationPart = errorMessage.substring(1, errorMessage.indexOf("]"));
                 String[] parts = locationPart.split(",");
+                // CORRECCIÓN: Acceder a los elementos del arreglo y aplicar replace
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
                 
-                // Extraer el lexema a resaltar (que ahora podría ser "4%2" o "cont%ador")
                 String lexemeToHighlight = "";
-                int lexemeLength = 1; // Default length
-
-                int startErrorMsgContent = errorMessage.indexOf("Error Léxico: '");
-                if (startErrorMsgContent != -1) {
-                    startErrorMsgContent += "Error Léxico: '".length();
-                    int endErrorMsgContent = errorMessage.indexOf("'", startErrorMsgContent);
-                    if (endErrorMsgContent != -1) {
-                        lexemeToHighlight = errorMessage.substring(startErrorMsgContent, endErrorMsgContent);
+                int lexemeLength = 1;
+                
+                int startLexicalError = errorMessage.indexOf("Error Léxico: '");
+                if (startLexicalError != -1) {
+                    startLexicalError += "Error Léxico: '".length();
+                    int endLexicalError = errorMessage.indexOf("'", startLexicalError);
+                    if (endLexicalError != -1) {
+                        lexemeToHighlight = errorMessage.substring(startLexicalError, endLexicalError);
                         lexemeLength = lexemeToHighlight.length();
+                        highlightError(line, col, lexemeLength);
+                        return;
                     }
-                } else { // Para errores sintácticos o semánticos que usan el lexema original del token
-                     startErrorMsgContent = errorMessage.indexOf("en '"); // Error en 'val'
-                     if(startErrorMsgContent != -1) {
-                         startErrorMsgContent += "en '".length();
-                         int endErrorMsgContent = errorMessage.indexOf("'", startErrorMsgContent);
-                         if(endErrorMsgContent != -1) {
-                             lexemeToHighlight = errorMessage.substring(startErrorMsgContent, endErrorMsgContent);
-                             lexemeLength = lexemeToHighlight.length();
-                         }
+                }
+                
+                int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
+                if (startSyntaxSemanticError != -1) {
+                     startSyntaxSemanticError += "Error en '".length();
+                     int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
+                     if (endSyntaxSemanticError != -1) {
+                         lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
+                         lexemeLength = lexemeToHighlight.length();
+                         highlightError(line, col, lexemeLength);
+                         return;
                      }
                 }
                 
-                // Si el lexer ha ajustado la columna para que el error empiece en el prefijo (ej. '4' en '4%2'),
-                // necesitamos que la columna que llega a `highlightError` ya esté ajustada.
-                // Como `Token.column` no se modifica en `addErrorToken` para la parte del prefijo,
-                // la `col` seguirá siendo la del carácter `%`.
-                // Entonces, el resaltado solo abarcará el `lexeme` del token de error (ej. `%2`).
-                // Para que el resaltado abarque "4%2", necesitaríamos que la columna original del Token.ERROR
-                // sea la del '4' y su lexema '4%2'. Esto implicaría más complejidad en el Lexer para "re-tokenizar"
-                // lo anterior como error.
-                
-                // Por ahora, resaltaremos desde la `col` recibida (que es la del inicio del error léxico como `%`)
-                // y con la longitud del `lexemeToHighlight` (que es el `errorMessage` completo como "4%2" o "cont%ador").
-                // Esto hará que el resaltado sea visualmente correcto si `col` es el inicio de `4` y `lexemeLength` la de `4%2`.
-                // Sin embargo, si `col` es la de `%` y `lexemeLength` es la de `4%2`, se resaltará desde `%` hasta el final de `2`.
-                // La solución ideal con `col` que indica `%` y `lexemeLength` de `4%2` es que el resaltado solo ocurra si `col` es el inicio real del lexema problemático.
-                // De lo contrario, visualmente quedará raro.
+                highlightError(line, col, 1);
 
-                // Haremos un ajuste para que el resaltado siempre intente ir desde la columna del error (ej. %) y tome la longitud del mensaje extendido (ej. %2, o 4%2 si se ajusta).
-                // Pero ten en cuenta que el `col` del mensaje de error es el inicio del token de error, no necesariamente el inicio del prefijo.
-
-                highlightError(line, col, lexemeLength);
             }
         } catch (Exception ex) {
             System.err.println("Error al intentar resaltar desde el mensaje: " + ex.getMessage());
         }
     }
-
-
-    private int getLexemeLengthFromErrorMessage(String errorMessage) {
-        // Esta función ahora se usa para determinar la longitud a resaltar.
-        // Queremos la longitud de la secuencia de caracteres reportada en el error.
-        int startQuote = errorMessage.indexOf("'");
-        if (startQuote != -1) {
-            startQuote++; // Skip the first quote
-            int endQuote = errorMessage.indexOf("'", startQuote);
-            if (endQuote != -1) {
-                return endQuote - startQuote;
-            }
-        }
-        return 1; // Default to 1 if no quoted lexeme found
-    }
-
 
     private void highlightError(int line, int col) {
         highlightError(line, col, 1);
