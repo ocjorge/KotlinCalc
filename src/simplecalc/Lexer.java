@@ -123,8 +123,50 @@ public class Lexer {
                c == '"' || (c == '.' && current + 1 < source.length() && source.charAt(current + 1) == '.');
     }
 
+    // REEMPLAZA tu método identifier() actual con este:
     private void identifier() {
-        while (isAlphaNumeric(peekLexerChar())) advanceLexerChar();
+        // Guardar posición inicial
+        int identifierStart = current - 1; // -1 porque ya consumimos el primer carácter
+
+        // Mirar hacia adelante para ver toda la secuencia hasta el próximo delimitador
+        int lookahead = current;
+        boolean hasInvalidChars = false;
+
+        while (lookahead < source.length() && 
+               !Character.isWhitespace(source.charAt(lookahead)) &&
+               source.charAt(lookahead) != '\n' &&
+               !isClearDelimiter(source.charAt(lookahead))) {
+
+            if (!isAlphaNumeric(source.charAt(lookahead))) {
+                hasInvalidChars = true;
+            }
+            lookahead++;
+        }
+
+        if (hasInvalidChars) {
+            // Toda la secuencia es inválida, construir y reportar como error
+            StringBuilder invalidSequence = new StringBuilder();
+            invalidSequence.append(source.charAt(identifierStart)); // Primer carácter ya consumido
+
+            // Consumir el resto de la secuencia inválida
+            while (current < lookahead) {
+                invalidSequence.append(source.charAt(current));
+                current++;
+            }
+
+            // Resetear posiciones para el token de error
+            current = identifierStart;
+            start = identifierStart;
+            current = lookahead; // Posicionar al final de la secuencia inválida
+
+            addErrorToken(invalidSequence.toString(), "Secuencia de caracteres inesperada: '%s'");
+            return;
+        }
+
+        // Si llegamos aquí, es un identificador válido (solo caracteres alfanuméricos)
+        while (isAlphaNumeric(peekLexerChar())) {
+            advanceLexerChar();
+        }
 
         String text = source.substring(start, current);
         Token.TokenType type = keywords.get(text);
