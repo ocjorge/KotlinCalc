@@ -245,69 +245,79 @@ public class SimpleCalcGUI extends JFrame {
     }
 
     private void processSyntaxAnalysis() {
-        outputArea.setText("");
-        inputArea.getHighlighter().removeAllHighlights();
-        statusLabel.setText("Realizando análisis sintáctico...");
-        statusLabel.setForeground(Color.BLACK);
+    outputArea.setText("");
+    inputArea.getHighlighter().removeAllHighlights();
+    statusLabel.setText("Realizando análisis sintáctico...");
+    statusLabel.setForeground(Color.BLACK);
 
-        String sourceCode = inputArea.getText();
-        Lexer lexer = new Lexer(sourceCode);
-        List<Token> tokens = lexer.scanTokens();
+    String sourceCode = inputArea.getText();
+    Lexer lexer = new Lexer(sourceCode);
+    List<Token> tokens = lexer.scanTokens();
 
-        List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+    List<String> lexicalErrors = tokens.stream()
+                                       .filter(t -> t.type == Token.TokenType.ERROR)
+                                       .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                               t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                       .collect(Collectors.toList());
 
-        StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder();
 
-        if (!lexicalErrors.isEmpty()) {
-            sb.append("--- Errores Léxicos Detectados (Impiden Análisis Sintáctico) ---\n");
-            for (String err : lexicalErrors) {
-                sb.append(err).append("\n");
-                highlightErrorFromMessage(err);
-            }
-            sb.append("\n");
-            sb.append(">>> No se puede realizar análisis sintáctico debido a errores léxicos. <<<\n");
-            statusLabel.setText("Resultado: Sintácticamente INVÁLIDO (Errores léxicos).");
-            statusLabel.setForeground(Color.RED);
-        } else {
-            Parser parser = new Parser(tokens);
-            boolean syntaxValid = false;
-            try {
-                syntaxValid = parser.parse();
-            } catch (Exception e) {
-                sb.append("Error grave durante el análisis sintáctico: ").append(e.getMessage()).append("\n");
-            }
-            List<String> syntaxErrors = parser.getErrors().stream()
-                                              .filter(err -> !err.contains("Error semántico"))
-                                              .collect(Collectors.toList());
-
-            if (!syntaxErrors.isEmpty()) {
-                sb.append("--- Errores Sintácticos Detectados ---\n");
-                for (String err : syntaxErrors) {
-                    sb.append(err).append("\n");
-                    highlightErrorFromMessage(err);
-                }
-                sb.append("\n");
-                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
-                statusLabel.setForeground(Color.RED);
-            } else if (!syntaxValid) {
-                sb.append("--- El análisis sintáctico terminó prematuramente o con estado inválido ---\n");
-                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
-                statusLabel.setForeground(Color.RED);
-            }
-            else {
-                sb.append(">>> El código es sintácticamente VÁLIDO. <<<\n");
-                statusLabel.setText("Resultado: Sintácticamente VÁLIDO.");
-                statusLabel.setForeground(new Color(0, 128, 0));
-            }
-        }
-
-        outputArea.setText(sb.toString());
-        outputArea.setCaretPosition(0);
+    // Siempre mostrar errores léxicos si existen
+    if (!lexicalErrors.isEmpty()) {
+        sb.append("");
     }
+
+    // Realizar análisis sintáctico independientemente de los errores léxicos
+    Parser parser = new Parser(tokens);
+    boolean syntaxValid = false;
+    try {
+        syntaxValid = parser.parse();
+    } catch (Exception e) {
+        sb.append("Error grave durante el análisis sintáctico: ").append(e.getMessage()).append("\n");
+    }
+    
+    List<String> syntaxErrors = parser.getErrors().stream()
+                                      .filter(err -> !err.contains("Error semántico"))
+                                      .collect(Collectors.toList());
+
+    // Mostrar errores sintácticos
+    if (!syntaxErrors.isEmpty()) {
+        sb.append("--- Errores Sintácticos Detectados ---\n");
+        for (String err : syntaxErrors) {
+            sb.append(err).append("\n");
+            highlightErrorFromMessage(err);
+        }
+        sb.append("\n");
+    }
+
+    // Determinar el estado final
+    if (!lexicalErrors.isEmpty() && !syntaxErrors.isEmpty()) {
+        sb.append(">>> El código contiene errores léxicos y sintácticos. <<<\n");
+        statusLabel.setText("Resultado: Léxica y sintácticamente INVÁLIDO.");
+        statusLabel.setForeground(Color.RED);
+    } else if (!lexicalErrors.isEmpty()) {
+        sb.append(">>> El código contiene errores léxicos que pueden afectar el análisis sintáctico. <<<\n");
+        statusLabel.setText("Resultado: Léxicamente INVÁLIDO.");
+        statusLabel.setForeground(Color.RED);
+    } else if (!syntaxErrors.isEmpty()) {
+        sb.append(">>> El código es léxicamente válido pero contiene errores sintácticos. <<<\n");
+        statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
+        statusLabel.setForeground(Color.RED);
+    } else if (!syntaxValid) {
+        sb.append("--- El análisis sintáctico terminó prematuramente o con estado inválido ---\n");
+        statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
+        statusLabel.setForeground(Color.RED);
+    } else {
+        sb.append(">>> El código es léxica y sintácticamente VÁLIDO. <<<\n");
+        statusLabel.setText("Resultado: Léxica y sintácticamente VÁLIDO.");
+        statusLabel.setForeground(new Color(0, 128, 0));
+    }
+
+    outputArea.setText(sb.toString());
+    outputArea.setCaretPosition(0);
+}
+
+     
 
     private void processSemanticAnalysis() {
         outputArea.setText("");
