@@ -1,7 +1,18 @@
-/* Desarrollado por 
+/*
+============================================================
+Proyecto: Calculadora Simple basado en Kotlin
+Desarrollado por 
 Orozco Reyes Hiram
 Ortiz Ceballso Jorge
 Salgado Rojas Marelin Iral
+
+Lenguajes y Automatas II
+Profa: Martínez Moreno Martha
+
+Descripción: programa que maneja etapas lexica, 
+sintactica, semantica por validación de entradas.
+
+
 */
 
 package simplecalc;
