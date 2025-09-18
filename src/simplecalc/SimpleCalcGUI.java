@@ -157,6 +157,7 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
         
         StringBuilder sb = new StringBuilder();
+        // Recopilamos todos los errores léxicos para el reporte
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -164,8 +165,8 @@ public class SimpleCalcGUI extends JFrame {
                                            .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        boolean syntaxValid = parser.parse();
-        List<String> syntaxAndSemanticErrors = parser.getErrors();
+        boolean syntaxAndSemanticValid = parser.parse(); // Ahora parser.parse() intentará ejecutar todo y recogerá todos los errores
+        List<String> allParserErrors = parser.getErrors(); // Obtiene todos los errores (sintácticos y semánticos)
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -176,16 +177,17 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
 
-        if (!syntaxAndSemanticErrors.isEmpty()) {
+        if (!allParserErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos/Semánticos Detectados ---\n");
-            for (String err : syntaxAndSemanticErrors) {
+            for (String err : allParserErrors) {
                 sb.append(err).append("\n");
                 highlightErrorFromMessage(err);
             }
             sb.append("\n");
         }
 
-        if (lexicalErrors.isEmpty() && syntaxValid) {
+        // El estado general es INVÁLIDO si hay CUALQUIER error
+        if (lexicalErrors.isEmpty() && allParserErrors.isEmpty() && syntaxAndSemanticValid) {
             sb.append(">>> El código Kotlin es léxica, sintáctica y semánticamente VÁLIDO. <<<\n");
             statusLabel.setText("Resultado: VÁLIDO.");
             statusLabel.setForeground(new Color(0, 128, 0));
@@ -254,6 +256,7 @@ public class SimpleCalcGUI extends JFrame {
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
 
+        // Recopilamos errores léxicos
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -262,47 +265,45 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
+        // Siempre intentamos parsear, incluso con errores léxicos.
+        // El parser registrará sus propios errores y los léxicos ya se pasaron como tokens ERROR.
+        Parser parser = new Parser(tokens);
+        parser.parse(); // Ejecuta el parseo y registra todos los errores (sintácticos y semánticos)
+
+        List<String> allParserErrors = parser.getErrors();
+        List<String> syntaxErrors = allParserErrors.stream()
+                                              .filter(err -> !err.contains("Error semántico")) // Filtramos solo sintácticos
+                                              .collect(Collectors.toList());
+
+        // Reportar errores léxicos primero
         if (!lexicalErrors.isEmpty()) {
-            sb.append("--- Errores Léxicos Detectados (Impiden Análisis Sintáctico) ---\n");
+            sb.append("--- Errores Léxicos Detectados ---\n");
             for (String err : lexicalErrors) {
                 sb.append(err).append("\n");
                 highlightErrorFromMessage(err);
             }
             sb.append("\n");
-            sb.append(">>> No se puede realizar análisis sintáctico debido a errores léxicos. <<<\n");
-            statusLabel.setText("Resultado: Sintácticamente INVÁLIDO (Errores léxicos).");
-            statusLabel.setForeground(Color.RED);
-        } else {
-            Parser parser = new Parser(tokens);
-            boolean syntaxValid = false;
-            try {
-                syntaxValid = parser.parse();
-            } catch (Exception e) {
-                sb.append("Error grave durante el análisis sintáctico: ").append(e.getMessage()).append("\n");
+        }
+        
+        // Reportar errores sintácticos
+        if (!syntaxErrors.isEmpty()) {
+            sb.append("--- Errores Sintácticos Detectados ---\n");
+            for (String err : syntaxErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
             }
-            List<String> syntaxErrors = parser.getErrors().stream()
-                                              .filter(err -> !err.contains("Error semántico"))
-                                              .collect(Collectors.toList());
+            sb.append("\n");
+        }
 
-            if (!syntaxErrors.isEmpty()) {
-                sb.append("--- Errores Sintácticos Detectados ---\n");
-                for (String err : syntaxErrors) {
-                    sb.append(err).append("\n");
-                    highlightErrorFromMessage(err);
-                }
-                sb.append("\n");
-                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
-                statusLabel.setForeground(Color.RED);
-            } else if (!syntaxValid) {
-                sb.append("--- El análisis sintáctico terminó prematuramente o con estado inválido ---\n");
-                statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
-                statusLabel.setForeground(Color.RED);
-            }
-            else {
-                sb.append(">>> El código es sintácticamente VÁLIDO. <<<\n");
-                statusLabel.setText("Resultado: Sintácticamente VÁLIDO.");
-                statusLabel.setForeground(new Color(0, 128, 0));
-            }
+        // Determinar el estado final
+        if (lexicalErrors.isEmpty() && syntaxErrors.isEmpty()) {
+            sb.append(">>> El código es sintácticamente VÁLIDO. <<<\n");
+            statusLabel.setText("Resultado: Sintácticamente VÁLIDO.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+        } else {
+            sb.append(">>> El código contiene errores sintácticos o léxicos. <<<\n");
+            statusLabel.setText("Resultado: Sintácticamente INVÁLIDO.");
+            statusLabel.setForeground(Color.RED);
         }
 
         outputArea.setText(sb.toString());
@@ -319,6 +320,7 @@ public class SimpleCalcGUI extends JFrame {
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
 
+        // Recopilamos errores léxicos
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -327,50 +329,57 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
+        // Siempre intentamos parsear para obtener todos los errores semánticos posibles
+        Parser parser = new Parser(tokens);
+        parser.parse(); // Ejecuta el parseo y registra todos los errores (sintácticos y semánticos)
+
+        List<String> allParserErrors = parser.getErrors(); // Obtiene todos los errores del parser
+        List<String> semanticErrors = allParserErrors.stream()
+                                               .filter(err -> err.contains("Error semántico"))
+                                               .collect(Collectors.toList());
+        List<String> syntaxErrors = allParserErrors.stream()
+                                                .filter(err -> !err.contains("Error semántico"))
+                                                .collect(Collectors.toList());
+
+        // Reportar errores léxicos
         if (!lexicalErrors.isEmpty()) {
-            sb.append("--- Errores Léxicos Detectados (Impiden Análisis Semántico) ---\n");
+            sb.append("--- Errores Léxicos Detectados ---\n");
             for (String err : lexicalErrors) {
                 sb.append(err).append("\n");
                 highlightErrorFromMessage(err);
             }
             sb.append("\n");
-            sb.append(">>> No se puede realizar análisis semántico debido a errores léxicos. <<<\n");
-            statusLabel.setText("Resultado: Semánticamente INVÁLIDO (Errores léxicos).");
-            statusLabel.setForeground(Color.RED);
-        } else {
-            Parser parser = new Parser(tokens);
-            parser.parse();
-            List<String> semanticErrors = parser.getErrors().stream()
-                                               .filter(err -> err.contains("Error semántico"))
-                                               .collect(Collectors.toList());
-            List<String> syntaxErrors = parser.getErrors().stream()
-                                                .filter(err -> !err.contains("Error semántico"))
-                                                .collect(Collectors.toList());
-
-            if (!syntaxErrors.isEmpty()) {
-                sb.append("--- Errores Sintácticos Detectados (Impiden Análisis Semántico Completo) ---\n");
-                for (String err : syntaxErrors) {
-                    sb.append(err).append("\n");
-                    highlightErrorFromMessage(err);
-                }
-                sb.append("\n");
-                sb.append(">>> No se puede garantizar un análisis semántico completo debido a errores sintácticos. <<<\n");
-                statusLabel.setText("Resultado: Semánticamente INVÁLIDO (Errores sintácticos).");
-                statusLabel.setForeground(Color.RED);
-            } else if (!semanticErrors.isEmpty()) {
-                sb.append("--- Errores Semánticos Detectados ---\n");
-                for (String err : semanticErrors) {
-                    sb.append(err).append("\n");
-                    highlightErrorFromMessage(err);
-                }
-                sb.append("\n");
-                statusLabel.setText("Resultado: Semánticamente INVÁLIDO.");
-                statusLabel.setForeground(Color.RED);
-            } else {
-                sb.append(">>> El código es semánticamente VÁLIDO. <<<\n");
-                statusLabel.setText("Resultado: Semánticamente VÁLIDO.");
-                statusLabel.setForeground(new Color(0, 128, 0));
+        }
+        
+        // Reportar errores sintácticos
+        if (!syntaxErrors.isEmpty()) {
+            sb.append("--- Errores Sintácticos Detectados ---\n");
+            for (String err : syntaxErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
             }
+            sb.append("\n");
+        }
+
+        // Reportar errores semánticos
+        if (!semanticErrors.isEmpty()) {
+            sb.append("--- Errores Semánticos Detectados ---\n");
+            for (String err : semanticErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n");
+        }
+
+        // Determinar el estado final
+        if (lexicalErrors.isEmpty() && syntaxErrors.isEmpty() && semanticErrors.isEmpty()) {
+            sb.append(">>> El código es semánticamente VÁLIDO. <<<\n");
+            statusLabel.setText("Resultado: Semánticamente VÁLIDO.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+        } else {
+            sb.append(">>> El código contiene errores. <<<\n");
+            statusLabel.setText("Resultado: Semánticamente INVÁLIDO.");
+            statusLabel.setForeground(Color.RED);
         }
 
         outputArea.setText(sb.toString());
@@ -382,7 +391,6 @@ public class SimpleCalcGUI extends JFrame {
             if (errorMessage.startsWith("[")) {
                 String locationPart = errorMessage.substring(1, errorMessage.indexOf("]"));
                 String[] parts = locationPart.split(",");
-                // CORRECCIÓN: Acceder a los elementos del arreglo y aplicar replace
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
                 
@@ -411,6 +419,19 @@ public class SimpleCalcGUI extends JFrame {
                          highlightError(line, col, lexemeLength);
                          return;
                      }
+                }
+                // Si es un error semántico que no usa el formato "Error en 'lexeme'",
+                // por ejemplo, "Error semántico cerca de 'lexeme'".
+                int startSemanticErrorNear = errorMessage.indexOf("Error semántico cerca de '");
+                if (startSemanticErrorNear != -1) {
+                    startSemanticErrorNear += "Error semántico cerca de '".length();
+                    int endSemanticErrorNear = errorMessage.indexOf("'", startSemanticErrorNear);
+                    if (endSemanticErrorNear != -1) {
+                        lexemeToHighlight = errorMessage.substring(startSemanticErrorNear, endSemanticErrorNear);
+                        lexemeLength = lexemeToHighlight.length();
+                        highlightError(line, col, lexemeLength);
+                        return;
+                    }
                 }
                 
                 highlightError(line, col, 1);

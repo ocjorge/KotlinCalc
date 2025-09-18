@@ -29,12 +29,17 @@ public class Parser {
         errors.clear();
         declaredVariables.clear();
         variableTypes.clear(); 
+        
+        // El bloque try-catch para SyntaxError y SemanticError global se mantiene
+        // pero SemanticError ya no lanza RuntimeException
         try {
             programa();
-        } catch (SyntaxError | SemanticError e) {
+        } catch (SyntaxError e) { // Solo atrapamos SyntaxError que aún lanzará RuntimeException
+            // El parseo se detuvo debido a un error sintáctico no recuperable.
             return false;
         }
-        return errors.isEmpty();
+        // SemanticError ya no detiene el parseo por lanzamiento de excepción.
+        return errors.isEmpty(); // Retorna si no hay errores (sintácticos o semánticos)
     }
     
     public List<Token> getTokens() {
@@ -98,12 +103,10 @@ public class Parser {
                 synchronizeToStatementBoundary();
             }
         } else if (check(READLINE_KEYWORD)) {
-            // Este caso es para un readLine() sin asignación directa, que no es una sentencia válida en Kotlin.
-            // readLine() siempre debe ser asignado a una variable.
             error(peek(), "Sentencia inválida: 'readLine()' debe ser asignado a una variable.",
                         "La función 'readLine()' debe utilizarse como parte de una asignación (ej. 'val x = readLine()').");
-            advance(); // Consumir READLINE_KEYWORD
-            if (check(PAREN_IZQ)) { // Intenta consumir los paréntesis si están presentes
+            advance(); 
+            if (check(PAREN_IZQ)) { 
                 advance();
                 if (check(PAREN_DER)) {
                     advance();
@@ -133,11 +136,11 @@ public class Parser {
     }
 
     private void declaracion_stmt() {
-        Token declarationType = advance(); // VAL_KEYWORD o VAR_KEYWORD
+        Token declarationType = advance(); 
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
         
         if (declaredVariables.contains(varNameToken.lexeme)) {
-             semanticError(varNameToken, "Redeclaración de variable.",
+             addSemanticError(varNameToken, "Redeclaración de variable.", // Changed to addSemanticError
                            "La variable '" + varNameToken.lexeme + "' ya ha sido declarada.");
         }
 
@@ -145,7 +148,7 @@ public class Parser {
         
         Token typeToken = consume(ID, "Se esperaba un tipo (ej. 'Int', 'String') después de ':'.");
         if (!isValidType(typeToken.lexeme)) {
-            semanticError(typeToken, "Tipo de dato no reconocido: '" + typeToken.lexeme + "'.",
+            addSemanticError(typeToken, "Tipo de dato no reconocido: '" + typeToken.lexeme + "'.", // Changed to addSemanticError
                           "Se esperaba un tipo de dato válido como 'Int' o 'String'.");
         }
 
@@ -165,11 +168,11 @@ public class Parser {
 
     private void asignacion_stmt() {
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable para la asignación.");
-        checkVariableInitialized(varNameToken);
+        checkVariableInitialized(varNameToken); // This method still throws, will adjust below
 
         String declaredType = variableTypes.get(varNameToken.lexeme);
         if (declaredType == null) { 
-             semanticError(varNameToken, "Error interno: Tipo de variable no encontrado.",
+             addSemanticError(varNameToken, "Error interno: Tipo de variable no encontrado.", // Changed to addSemanticError
                            "La variable '" + varNameToken.lexeme + "' no tiene un tipo asignado.");
              declaredType = "Unknown";
         }
@@ -186,10 +189,6 @@ public class Parser {
     }
 
     private void entrada_stmt() {
-        // Este método ya no se llama desde sentencia(), porque readLine() sin asignación es un error.
-        // Si se llama, es porque quizás se quiera un `readLine()` independiente, pero en Kotlin
-        // debe asignarse. Mantenerlo aquí para futuras expansiones si se desea un `input()`
-        // que no sea asignado directamente.
         consume(READLINE_KEYWORD, "Error interno: Se esperaba 'readLine' para entrada_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
         consume(PAREN_DER, "Se esperaba ')' después de '('.");
@@ -250,7 +249,7 @@ public class Parser {
         
         Token loopVarName = consume(ID, "Se esperaba un nombre de variable para el bucle 'for'.");
         if (declaredVariables.contains(loopVarName.lexeme)) {
-             semanticError(loopVarName, "Redeclaración de variable.",
+             addSemanticError(loopVarName, "Redeclaración de variable.", // Changed to addSemanticError
                            "La variable '" + loopVarName.lexeme + "' ya ha sido declarada.");
         }
         declaredVariables.add(loopVarName.lexeme); 
@@ -298,23 +297,22 @@ public class Parser {
 
 
     private void condicion_simple() {
-        String leftOperandType = expresion_aritmetica(); // Esto parsea y obtiene el tipo de "contador"
+        String leftOperandType = expresion_aritmetica(); 
         
-        // El operador relacional se consume aquí
-        Token operatorToken = peek(); // Captura el token del operador para usarlo en errores semánticos
-        operador_relacional(); // Esto avanza 'current' para consumir el operador como '<'
+        Token operatorToken = peek(); 
+        operador_relacional(); 
 
-        String rightOperandType = expresion_aritmetica(); // Esto parsea y obtiene el tipo de "3"
+        String rightOperandType = expresion_aritmetica(); 
 
         if (!leftOperandType.equals("Unknown") && !rightOperandType.equals("Unknown") &&
             !leftOperandType.equals("ErrorType") && !rightOperandType.equals("ErrorType")) {
             
             if (!leftOperandType.equals(rightOperandType)) {
-                semanticError(operatorToken, "Incompatibilidad de tipos en la condición.",
+                addSemanticError(operatorToken, "Incompatibilidad de tipos en la condición.", // Changed to addSemanticError
                               "No se puede comparar un tipo '" + leftOperandType + "' con un tipo '" + rightOperandType + "'.");
             }
             if (!leftOperandType.equals("Int") && !leftOperandType.equals("String")) { 
-                 semanticError(operatorToken, "Tipo de dato no comparable.",
+                 addSemanticError(operatorToken, "Tipo de dato no comparable.", // Changed to addSemanticError
                                "Las comparaciones solo están permitidas para tipos 'Int' o 'String'. Tipo encontrado: '" + leftOperandType + "'.");
             }
         }
@@ -339,21 +337,6 @@ public class Parser {
         while (match(OP_SUMA, OP_RESTA)) {
             Token operator = previous(); 
             
-            // Check for unexpected relational operator within arithmetic expression
-            if(operator.type == OP_MENOR || operator.type == OP_MAYOR || operator.type == OP_IGUAL_IGUAL) {
-                 // This should technically be caught by syntax, but as a safeguard or if parsing is off,
-                 // report as semantic error too.
-                 semanticError(operator, "Operador relacional inesperado en expresión aritmética.",
-                               "Se esperaba un operador aritmético (+, -) pero se encontró un operador relacional.");
-                 type = "ErrorType"; // Propagate error type
-                 // We don't advance here, the next `termino()` call will try to parse.
-                 // The `condicion_simple` is responsible for consuming the relational op.
-                 // This is a tricky point in LL(1) grammars, when tokens can belong to different rules.
-                 // For now, let's assume `condicion_simple` handles its relational op properly.
-                 // This `if` block here might be redundant or even harmful if `condicion_simple` is done well.
-                 // REMOVE this `if` block if `condicion_simple` is robust.
-            }
-            
             String rightType = termino();
 
             if (type.equals("Unknown") || rightType.equals("Unknown")) {
@@ -365,7 +348,7 @@ public class Parser {
             } else if (type.equals("String") && rightType.equals("String") && operator.type == OP_SUMA) {
                 type = "String"; 
             } else {
-                semanticError(operator, "Incompatibilidad de tipos en operación.",
+                addSemanticError(operator, "Incompatibilidad de tipos en operación.", // Changed to addSemanticError
                               "Operación '" + operator.lexeme + "' entre '" + type + "' y '" + rightType + "' no permitida.");
                 type = "ErrorType";
             }
@@ -386,7 +369,7 @@ public class Parser {
             } else if (type.equals("Int") && rightType.equals("Int")) {
                 type = "Int";
             } else {
-                semanticError(operator, "Incompatibilidad de tipos en operación.",
+                addSemanticError(operator, "Incompatibilidad de tipos en operación.", // Changed to addSemanticError
                               "Operación '" + operator.lexeme + "' entre '" + type + "' y '" + rightType + "' no permitida.");
                 type = "ErrorType";
             }
@@ -406,9 +389,16 @@ public class Parser {
         String type = "Unknown";
         if (check(ID)) {
             Token idToken = peek();
-            checkVariableInitialized(idToken); 
-            type = variableTypes.get(idToken.lexeme); 
-            if (type == null) type = "Unknown"; 
+            // checkVariableInitialized(idToken); // This method still throws, will adjust below
+            // Instead of throwing, just check and if not declared, set type to Unknown and add error
+            if (!declaredVariables.contains(idToken.lexeme)) {
+                addSemanticError(idToken, "Variable no inicializada: " + idToken.lexeme,
+                                "La variable '" + idToken.lexeme + "' se usa antes de declararla.");
+                type = "Unknown"; // Type is unknown if not declared
+            } else {
+                type = variableTypes.get(idToken.lexeme); 
+                if (type == null) type = "Unknown"; // Fallback if type somehow not in map
+            }
             consume(ID, "");
         } else if (check(NUMERO_ENTERO)) {
             type = "Int";
@@ -462,12 +452,24 @@ public class Parser {
         return e;
     }
 
-    private SemanticError semanticError(Token token, String generalMessage, String specificMessageToUser) {
+    // MODIFICADO: semanticError ya no lanza una excepción
+    private void addSemanticError(Token token, String generalMessage, String specificMessageToUser) {
         SemanticError e = new SemanticError(token, generalMessage, specificMessageToUser);
         errors.add(e.getMessage());
-        return e;
+        // No lanzamos la excepción aquí, solo la agregamos a la lista
     }
 
+    // MODIFICADO: checkVariableInitialized ahora usa addSemanticError
+    private void checkVariableInitialized(Token name) {
+        if (!declaredVariables.contains(name.lexeme)) {
+            addSemanticError(name,
+                    "Variable no inicializada: " + name.lexeme,
+                    "La variable '" + name.lexeme + "' se usa antes de declararla.");
+            // No lanzamos la excepción aquí, solo la agregamos.
+            // Es importante que el flujo del parser pueda continuar después de este error.
+        }
+    }
+    
     private boolean match(Token.TokenType... types) {
         for (Token.TokenType type : types) {
             if (check(type)) {
@@ -514,14 +516,6 @@ public class Parser {
         }
         return tokens.get(current - 1);
     }
-
-    private void checkVariableInitialized(Token name) {
-        if (!declaredVariables.contains(name.lexeme)) {
-            throw semanticError(name,
-                    "Variable no inicializada: " + name.lexeme,
-                    "La variable '" + name.lexeme + "' se usa antes de declararla.");
-        }
-    }
     
     private boolean isValidType(String typeName) {
         return typeName.equals("Int") || typeName.equals("String");
@@ -533,7 +527,7 @@ public class Parser {
         }
         
         if (!expectedType.equals(actualType)) {
-            throw semanticError(problemToken, "Incompatibilidad de tipos en asignación.",
+            addSemanticError(problemToken, "Incompatibilidad de tipos en asignación.", // Changed to addSemanticError
                                 "Se esperaba un valor de tipo '" + expectedType + "' pero se encontró un tipo '" + actualType + "'.");
         }
     }
