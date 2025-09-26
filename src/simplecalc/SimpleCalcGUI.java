@@ -19,7 +19,7 @@ public class SimpleCalcGUI extends JFrame {
 
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1000, 600); 
+        setSize(1200, 700); // Aumentar tamaño para la nueva salida
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -42,27 +42,27 @@ public class SimpleCalcGUI extends JFrame {
         inputScrollPane.setRowHeaderView(lineNumbers);
 
         inputArea.setText("fun main() {\n" +
-                "    val numero: Int = 42\n" +
-                "    var contador: Int = 0\n" +
-                "    while (contador < 3) {\n" +
-                "        print(\"Contador: \")\n" +
-                "        print(contador)\n" +
-                "        print(\"\\n\")\n" +
-                "        contador = contador + 1\n" +
-                "    }\n" +
-                "    \n" +
-                "    val limiteFor: Int = 5\n" +
-                "    for (i in 0..limiteFor) {\n" +
-                "        print(\"Iteracion For: \")\n" +
-                "        print(i)\n" +
+                "    val a: Int = 10\n" +
+                "    var b: Int = a + 2 * 5\n" +
+                "    val c: Int = (b - 3) / 2\n" +
+                "    print(\"El valor de c es: \")\n" +
+                "    print(c)\n" +
+                "    print(\"\\n\")\n" +
+                "    var x: Int = 0\n" +
+                "    while (x < 3) {\n" +
+                "        x = x + 1\n" +
+                "        print(\"x en while: \")\n" +
+                "        print(x)\n" +
                 "        print(\"\\n\")\n" +
                 "    }\n" +
-                "    \n" +
-                "    val input: String = readLine()\n" +
-                "    if (numero > 50) {\n" +
-                "        print(\"Mayor que 50\")\n" +
+                "    for (y in 1..2) {\n" +
+                "        print(\"y en for: \")\n" +
+                "        print(y * 10)\n" +
+                "        print(\"\\n\")\n" +
                 "    }\n" +
-                "    print(\"Fin del programa de ejemplo.\")\n" +
+                "    val mensaje: String = \"Resultado: \" + c\n" +
+                "    print(mensaje)\n" +
+                "    print(\"\\n\")\n" +
                 "}");
 
         outputArea = new JTextArea();
@@ -102,6 +102,15 @@ public class SimpleCalcGUI extends JFrame {
                 processSemanticAnalysis();
             }
         });
+        
+        // NUEVO BOTÓN: Generar Intermedio
+        JButton generateIntermediateButton = new JButton("Generar Intermedio");
+        generateIntermediateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                generateIntermediateCode();
+            }
+        });
 
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
@@ -124,6 +133,7 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(lexicalButton);
         buttonPanel.add(syntaxButton);
         buttonPanel.add(semanticButton);
+        buttonPanel.add(generateIntermediateButton); // Añadir el nuevo botón
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
@@ -157,7 +167,6 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
         
         StringBuilder sb = new StringBuilder();
-        // Recopilamos todos los errores léxicos para el reporte
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -165,7 +174,7 @@ public class SimpleCalcGUI extends JFrame {
                                            .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        boolean syntaxAndSemanticValid = parser.parse(); // Ahora parser.parse() intentará ejecutar todo y recogerá todos los errores
+        parser.parse(); // Intentará ejecutar todo y recogerá todos los errores
         List<String> allParserErrors = parser.getErrors(); // Obtiene todos los errores (sintácticos y semánticos)
 
         if (!lexicalErrors.isEmpty()) {
@@ -186,8 +195,7 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
 
-        // El estado general es INVÁLIDO si hay CUALQUIER error
-        if (lexicalErrors.isEmpty() && allParserErrors.isEmpty() && syntaxAndSemanticValid) {
+        if (lexicalErrors.isEmpty() && allParserErrors.isEmpty()) {
             sb.append(">>> El código Kotlin es léxica, sintáctica y semánticamente VÁLIDO. <<<\n");
             statusLabel.setText("Resultado: VÁLIDO.");
             statusLabel.setForeground(new Color(0, 128, 0));
@@ -256,7 +264,6 @@ public class SimpleCalcGUI extends JFrame {
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
 
-        // Recopilamos errores léxicos
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -265,17 +272,14 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
-        // Siempre intentamos parsear, incluso con errores léxicos.
-        // El parser registrará sus propios errores y los léxicos ya se pasaron como tokens ERROR.
         Parser parser = new Parser(tokens);
         parser.parse(); // Ejecuta el parseo y registra todos los errores (sintácticos y semánticos)
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
-                                              .filter(err -> !err.contains("Error semántico")) // Filtramos solo sintácticos
+                                              .filter(err -> !err.contains("Error semántico")) 
                                               .collect(Collectors.toList());
 
-        // Reportar errores léxicos primero
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
             for (String err : lexicalErrors) {
@@ -285,7 +289,6 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
         
-        // Reportar errores sintácticos
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -295,7 +298,6 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
 
-        // Determinar el estado final
         if (lexicalErrors.isEmpty() && syntaxErrors.isEmpty()) {
             sb.append(">>> El código es sintácticamente VÁLIDO. <<<\n");
             statusLabel.setText("Resultado: Sintácticamente VÁLIDO.");
@@ -320,7 +322,6 @@ public class SimpleCalcGUI extends JFrame {
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
 
-        // Recopilamos errores léxicos
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
                                            .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
@@ -329,11 +330,10 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
-        // Siempre intentamos parsear para obtener todos los errores semánticos posibles
         Parser parser = new Parser(tokens);
-        parser.parse(); // Ejecuta el parseo y registra todos los errores (sintácticos y semánticos)
+        parser.parse(); 
 
-        List<String> allParserErrors = parser.getErrors(); // Obtiene todos los errores del parser
+        List<String> allParserErrors = parser.getErrors(); 
         List<String> semanticErrors = allParserErrors.stream()
                                                .filter(err -> err.contains("Error semántico"))
                                                .collect(Collectors.toList());
@@ -341,7 +341,6 @@ public class SimpleCalcGUI extends JFrame {
                                                 .filter(err -> !err.contains("Error semántico"))
                                                 .collect(Collectors.toList());
 
-        // Reportar errores léxicos
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
             for (String err : lexicalErrors) {
@@ -351,7 +350,6 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
         
-        // Reportar errores sintácticos
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -361,7 +359,6 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
 
-        // Reportar errores semánticos
         if (!semanticErrors.isEmpty()) {
             sb.append("--- Errores Semánticos Detectados ---\n");
             for (String err : semanticErrors) {
@@ -371,7 +368,6 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n");
         }
 
-        // Determinar el estado final
         if (lexicalErrors.isEmpty() && syntaxErrors.isEmpty() && semanticErrors.isEmpty()) {
             sb.append(">>> El código es semánticamente VÁLIDO. <<<\n");
             statusLabel.setText("Resultado: Semánticamente VÁLIDO.");
@@ -386,6 +382,63 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setCaretPosition(0);
     }
     
+    // NUEVO: Método para generar el código intermedio
+    private void generateIntermediateCode() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Generando código intermedio...");
+        statusLabel.setForeground(Color.BLACK);
+
+        String sourceCode = inputArea.getText();
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+        
+        StringBuilder sb = new StringBuilder();
+        List<String> lexicalErrors = tokens.stream()
+                                           .filter(t -> t.type == Token.TokenType.ERROR)
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                           .collect(Collectors.toList());
+
+        Parser parser = new Parser(tokens);
+        parser.parse(); // Ejecutar parseo completo para recolectar expresiones y errores
+        List<String> allParserErrors = parser.getErrors();
+
+        if (!lexicalErrors.isEmpty() || !allParserErrors.isEmpty()) {
+            sb.append("--- Errores Detectados (Impiden Generación de Código Intermedio) ---\n");
+            for (String err : lexicalErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            for (String err : allParserErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n>>> No se puede generar código intermedio debido a los errores anteriores. <<<\n");
+            statusLabel.setText("Resultado: Generación de Intermedio FALLIDA.");
+            statusLabel.setForeground(Color.RED);
+        } else {
+            sb.append("--- Generación de Código Intermedio ---\n\n");
+            List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
+
+            if (expressions.isEmpty()) {
+                sb.append("No se encontraron expresiones aritméticas válidas para procesar.\n");
+            } else {
+                for (int i = 0; i < expressions.size(); i++) {
+                    Parser.ExpressionData data = expressions.get(i);
+                    sb.append("Expresión #").append(i + 1).append(":\n");
+                    sb.append(data.toString()).append("\n");
+                }
+            }
+            sb.append(">>> Código intermedio generado exitosamente. <<<\n");
+            statusLabel.setText("Resultado: Intermedio Generado.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+        }
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+    }
+
     private void highlightErrorFromMessage(String errorMessage) {
         try {
             if (errorMessage.startsWith("[")) {
@@ -420,8 +473,6 @@ public class SimpleCalcGUI extends JFrame {
                          return;
                      }
                 }
-                // Si es un error semántico que no usa el formato "Error en 'lexeme'",
-                // por ejemplo, "Error semántico cerca de 'lexeme'".
                 int startSemanticErrorNear = errorMessage.indexOf("Error semántico cerca de '");
                 if (startSemanticErrorNear != -1) {
                     startSemanticErrorNear += "Error semántico cerca de '".length();
@@ -504,18 +555,5 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLACK);
     }
 
-    public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new SimpleCalcGUI().setVisible(true);
-            }
-        });
-    }
 }
