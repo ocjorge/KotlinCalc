@@ -19,7 +19,7 @@ public class SimpleCalcGUI extends JFrame {
 
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1200, 700); // Aumentar tamaño para la nueva salida
+        setSize(1200, 700); 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -63,6 +63,8 @@ public class SimpleCalcGUI extends JFrame {
                 "    val mensaje: String = \"Resultado: \" + c\n" +
                 "    print(mensaje)\n" +
                 "    print(\"\\n\")\n" +
+                "    val cadenaSimple: String = \"Solo texto\"\n" +
+                "    print(cadenaSimple)\n" +
                 "}");
 
         outputArea = new JTextArea();
@@ -103,7 +105,6 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
         
-        // NUEVO BOTÓN: Generar Intermedio
         JButton generateIntermediateButton = new JButton("Generar Intermedio");
         generateIntermediateButton.addActionListener(new ActionListener() {
             @Override
@@ -133,7 +134,7 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(lexicalButton);
         buttonPanel.add(syntaxButton);
         buttonPanel.add(semanticButton);
-        buttonPanel.add(generateIntermediateButton); // Añadir el nuevo botón
+        buttonPanel.add(generateIntermediateButton);
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
@@ -174,8 +175,8 @@ public class SimpleCalcGUI extends JFrame {
                                            .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        parser.parse(); // Intentará ejecutar todo y recogerá todos los errores
-        List<String> allParserErrors = parser.getErrors(); // Obtiene todos los errores (sintácticos y semánticos)
+        parser.parse(); 
+        List<String> allParserErrors = parser.getErrors(); 
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -273,7 +274,7 @@ public class SimpleCalcGUI extends JFrame {
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); // Ejecuta el parseo y registra todos los errores (sintácticos y semánticos)
+        parser.parse(); 
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
@@ -382,7 +383,6 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setCaretPosition(0);
     }
     
-    // NUEVO: Método para generar el código intermedio
     private void generateIntermediateCode() {
         outputArea.setText("");
         inputArea.getHighlighter().removeAllHighlights();
@@ -422,7 +422,7 @@ public class SimpleCalcGUI extends JFrame {
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
             if (expressions.isEmpty()) {
-                sb.append("No se encontraron expresiones aritméticas válidas para procesar.\n");
+                sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
                 for (int i = 0; i < expressions.size(); i++) {
                     Parser.ExpressionData data = expressions.get(i);

@@ -6,8 +6,9 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Stack; // Necesario para el algoritmo de conversión
+import java.util.Stack; 
 import static simplecalc.Token.TokenType.*;
+import java.util.stream.Collectors; 
 
 public class Parser {
 
@@ -15,49 +16,62 @@ public class Parser {
     private int current = 0;
     private List<String> errors = new ArrayList<>();
     private Set<String> declaredVariables = new HashSet<>();
-    private Map<String, String> variableTypes = new HashMap<>(); // Variable name -> Type String ("Int", "String")
+    private Map<String, String> variableTypes = new HashMap<>(); 
 
-    // NUEVO: Lista para almacenar las expresiones aritméticas válidas encontradas
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
     
     // Clase auxiliar para almacenar los datos de cada expresión
-    public static class ExpressionData {
+    public static class ExpressionData { 
         List<Token> infixTokens;
         String prefixExpression;
-        List<String> stackSimulation; // Para la simulación de la pila
-        List<String> quadruples; // Para los cuádruplos
+        List<String> postFixTokensString; 
+        List<String> prefixStackSimulation; 
+        List<String> quadruples; 
+        List<String> quadrupleStackSimulation; 
 
         public ExpressionData(List<Token> infixTokens) {
-            this.infixTokens = new ArrayList<>(infixTokens); // Copia profunda
+            this.infixTokens = new ArrayList<>(infixTokens); 
             this.prefixExpression = "";
-            this.stackSimulation = new ArrayList<>();
+            this.postFixTokensString = new ArrayList<>();
+            this.prefixStackSimulation = new ArrayList<>(); 
             this.quadruples = new ArrayList<>();
+            this.quadrupleStackSimulation = new ArrayList<>();
         }
 
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append("  Original (Infija): ").append(tokensToString(infixTokens)).append("\n");
-            sb.append("  Prefija:           ").append(prefixExpression).append("\n");
-            sb.append("  Simulación Pila:\n");
-            for (String step : stackSimulation) {
-                sb.append("    ").append(step).append("\n");
-            }
-            sb.append("  Cuádruplos:\n");
-            for (String quad : quadruples) {
-                sb.append("    ").append(quad).append("\n");
-            }
-            return sb.toString();
-        }
-
-        private String tokensToString(List<Token> tokens) {
-            StringBuilder sb = new StringBuilder();
-            for (Token t : tokens) {
-                if (t.type != EOL && t.type != EOF) {
-                    sb.append(t.lexeme).append(" ");
+            sb.append("  Original (Infija): ").append(Parser.tokensToString(infixTokens)).append("\n"); 
+            sb.append("  Notación Postfija (Shunting-Yard): ").append(String.join(" ", postFixTokensString)).append("\n"); 
+            sb.append("  Simulación Pila (Infija a Postfija):\n");
+            if (prefixStackSimulation.isEmpty()) { 
+                sb.append("    (No aplica para expresiones de un solo operando o sin operadores complejos)\n");
+            } else {
+                for (String step : prefixStackSimulation) {
+                    sb.append("    ").append(step).append("\n");
                 }
             }
-            return sb.toString().trim();
+            
+            sb.append("  Prefija (desde Postfija): ").append(prefixExpression).append("\n"); 
+            
+            sb.append("  Cuádruplos (Tres Direcciones):\n");
+            if (quadruples.isEmpty()) {
+                 sb.append("    (No aplica para expresiones de un solo operando o errores)\n");
+            } else {
+                for (String quad : quadruples) {
+                    sb.append("    ").append(quad).append("\n");
+                }
+            }
+            
+            sb.append("  Simulación Pila (Generación Cuádruplos):\n");
+            if (quadrupleStackSimulation.isEmpty()) {
+                sb.append("    (No aplica para expresiones de un solo operando o errores)\n");
+            } else {
+                for (String step : quadrupleStackSimulation) {
+                    sb.append("    ").append(step).append("\n");
+                }
+            }
+            return sb.toString();
         }
     }
 
@@ -69,7 +83,6 @@ public class Parser {
         return errors;
     }
 
-    // NUEVO: Método para obtener los datos de las expresiones para la GUI
     public List<ExpressionData> getCollectedExpressions() {
         return collectedExpressions;
     }
@@ -79,7 +92,7 @@ public class Parser {
         errors.clear();
         declaredVariables.clear();
         variableTypes.clear(); 
-        collectedExpressions.clear(); // Limpiar expresiones recolectadas en cada parseo
+        collectedExpressions.clear(); 
         
         try {
             programa();
@@ -144,7 +157,6 @@ public class Parser {
                 System.out.println("DEBUG: sentencia: ID seguido de ASIGNACION -> asignacion_stmt()");
                 asignacion_stmt();
             } else {
-                System.out.println("DEBUG: sentencia: ID no seguido de ASIGNACION -> error");
                 error(peek(), "Sentencia inválida comenzando con ID '" + peek().lexeme + "'.",
                         "Un identificador debe ser parte de una asignación (ej: variable = valor).");
                 synchronizeToStatementBoundary();
@@ -182,9 +194,6 @@ public class Parser {
     }
 
     private void declaracion_stmt() {
-        Token startToken = peek(); // Capturar el token de inicio de la expresión
-        int startExprIndex = current; // Posición de inicio de la expresión
-        
         Token declarationType = advance(); 
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
         
@@ -204,10 +213,10 @@ public class Parser {
         consume(ASIGNACION, "Se esperaba '=' después del tipo '" + typeToken.lexeme + "'.");
         
         // --- Expresión de asignación ---
-        int exprStart = current; // Inicio de la expresión
+        int exprStart = current; 
         String declaredType = typeToken.lexeme;
         String assignedExpressionType = expresion_aritmetica(); 
-        int exprEnd = current; // Fin de la expresión
+        int exprEnd = current; 
 
         checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
 
@@ -215,18 +224,18 @@ public class Parser {
         variableTypes.put(varNameToken.lexeme, declaredType);
         System.out.println("DEBUG declaracion_stmt: Declarando variable: " + varNameToken.lexeme + " de tipo: " + declaredType);
 
-        // NUEVO: Si la expresión es válida, la recolectamos
+        // SOLO recolectar si es una expresión aritmética válida
         if (!assignedExpressionType.equals("Unknown") && !assignedExpressionType.equals("ErrorType")) {
-            collectExpression(tokens.subList(exprStart, exprEnd));
+            List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
+            if (hasArithmeticOperators(subExprTokens) || isSingleOperandArithmeticExpression(subExprTokens)) { 
+                collectExpression(subExprTokens, assignedExpressionType, varNameToken.lexeme); // Pasar el nombre de la variable para la asignación final
+            }
         }
 
         consumeOptionalEOLs();
     }
 
     private void asignacion_stmt() {
-        Token startToken = peek(); // Capturar el token de inicio de la expresión
-        int startExprIndex = current; // Posición de inicio de la expresión
-        
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable para la asignación.");
         checkVariableInitialized(varNameToken);
 
@@ -240,25 +249,26 @@ public class Parser {
         consume(ASIGNACION, "Se esperaba '=' después del nombre de variable '" + varNameToken.lexeme + "'.");
         
         // --- Expresión de asignación ---
-        int exprStart = current; // Inicio de la expresión
+        int exprStart = current;
         String assignedExpressionType = expresion_aritmetica(); 
-        int exprEnd = current; // Fin de la expresión
+        int exprEnd = current;
 
         checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
 
         System.out.println("DEBUG asignacion_stmt: Asignando a variable: " + varNameToken.lexeme + " con tipo: " + assignedExpressionType);
 
-        // NUEVO: Si la expresión es válida, la recolectamos
+        // SOLO recolectar si es una expresión aritmética válida
         if (!assignedExpressionType.equals("Unknown") && !assignedExpressionType.equals("ErrorType")) {
-            collectExpression(tokens.subList(exprStart, exprEnd));
+            List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
+            if (hasArithmeticOperators(subExprTokens) || isSingleOperandArithmeticExpression(subExprTokens)) {
+                collectExpression(subExprTokens, assignedExpressionType, varNameToken.lexeme); // Pasar el nombre de la variable para la asignación final
+            }
         }
 
         consumeOptionalEOLs();
     }
 
     private void entrada_stmt() {
-        // Not used as a standalone statement; handled in assignment or declaration.
-        // This method exists for completeness if we allowed standalone input in the future.
         consume(READLINE_KEYWORD, "Error interno: Se esperaba 'readLine' para entrada_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
         consume(PAREN_DER, "Se esperaba ')' después de '('.");
@@ -270,13 +280,18 @@ public class Parser {
         consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
         
         // --- Expresión de print ---
-        int exprStart = current; // Inicio de la expresión
-        String exprType = expresion_aritmetica(); // El tipo de lo que se imprime
-        int exprEnd = current; // Fin de la expresión
+        int exprStart = current;
+        String exprType = expresion_aritmetica(); 
+        int exprEnd = current;
         
-        // NUEVO: Recolectar la expresión de print si es válida
+        // No generamos cuádruplos de asignación final para print directamente,
+        // pero la expresión dentro del print sí puede ser una expresión aritmética.
+        // Recolectamos la expresión si es aritmética y válida.
         if (!exprType.equals("Unknown") && !exprType.equals("ErrorType")) {
-            collectExpression(tokens.subList(exprStart, exprEnd));
+            List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
+            if (hasArithmeticOperators(subExprTokens) || isSingleOperandArithmeticExpression(subExprTokens)) {
+                 collectExpression(subExprTokens, exprType, "print_target"); // Target especial para "print"
+            }
         }
         
         consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'."); 
@@ -288,19 +303,8 @@ public class Parser {
         consume(PAREN_IZQ, "Se esperaba '(' después de 'if'.");
         
         // --- Condición del if ---
-        int exprStart = current; // Inicio de la expresión de condición
-        condicion_simple(); // Esto ya hace su propio análisis de tipos
-        int exprEnd = current; // Fin de la expresión de condición
+        condicion_simple(); // Las condiciones no generan cuádruplos aritméticos
         
-        // NUEVO: Recolectar la expresión de condición si es válida
-        // No hay un tipo de retorno directo de condicion_simple, se basa en los errores internos.
-        // Podríamos modificar condicion_simple para devolver un boolean indicando validez.
-        // Por simplicidad, solo recolectamos si no hubo errores en ese rango.
-        // Esto es un placeholder; la validez real viene de `errors` global.
-        // Si queremos ser más precisos, `condicion_simple` debería devolver si la expresión fue parseada sin errores.
-        // Por ahora, si no hubo errores semánticos para la condición, la recolectamos.
-        // collectExpression(tokens.subList(exprStart, exprEnd)); // Esto se hará si hay una forma más robusta de validar la expresión de condición individualmente.
-
         consume(PAREN_DER, "Se esperaba ')' después de la condición en 'if'.");
         bloque_if();
     }
@@ -333,11 +337,7 @@ public class Parser {
         consume(WHILE_KEYWORD, "Se esperaba 'while'.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'while'.");
         
-        // --- Condición del while ---
-        int exprStart = current; // Inicio de la expresión de condición
-        condicion_simple(); // Esto ya hace su propio análisis de tipos
-        int exprEnd = current; // Fin de la expresión de condición
-        // collectExpression(tokens.subList(exprStart, exprEnd)); // Similar al if_stmt
+        condicion_simple(); // Las condiciones no generan cuádruplos aritméticos
 
         consume(PAREN_DER, "Se esperaba ')' después de la condición en 'while'.");
         bloque_loop();
@@ -365,7 +365,10 @@ public class Parser {
         int rangeStartExprEnd = current;
         checkTypeCompatibility("Int", rangeStartType, previous());
         if (!rangeStartType.equals("Unknown") && !rangeStartType.equals("ErrorType")) {
-            collectExpression(tokens.subList(rangeStartExprStart, rangeStartExprEnd));
+            List<Token> subExprTokens = tokens.subList(rangeStartExprStart, rangeStartExprEnd);
+            if (hasArithmeticOperators(subExprTokens) || isSingleOperandArithmeticExpression(subExprTokens)) {
+                collectExpression(subExprTokens, rangeStartType, "range_start"); // Target especial
+            }
         }
         
         consume(DOT_DOT, "Se esperaba '..' para definir el rango en el bucle 'for'.");
@@ -376,7 +379,10 @@ public class Parser {
         int rangeEndExprEnd = current;
         checkTypeCompatibility("Int", rangeEndType, previous());
         if (!rangeEndType.equals("Unknown") && !rangeEndType.equals("ErrorType")) {
-            collectExpression(tokens.subList(rangeEndExprStart, rangeEndExprEnd));
+            List<Token> subExprTokens = tokens.subList(rangeEndExprStart, rangeEndExprEnd);
+            if (hasArithmeticOperators(subExprTokens) || isSingleOperandArithmeticExpression(subExprTokens)) {
+                collectExpression(subExprTokens, rangeEndType, "range_end"); // Target especial
+            }
         }
 
         consume(PAREN_DER, "Se esperaba ')' después del rango en 'for'.");
@@ -409,20 +415,13 @@ public class Parser {
 
 
     private void condicion_simple() {
-        // --- Operando izquierdo de la condición ---
-        int leftExprStart = current;
         String leftOperandType = expresion_aritmetica(); 
-        int leftExprEnd = current;
         
         Token operatorToken = peek(); 
         operador_relacional(); 
 
-        // --- Operando derecho de la condición ---
-        int rightExprStart = current;
         String rightOperandType = expresion_aritmetica(); 
-        int rightExprEnd = current;
 
-        // Validaciones semánticas
         if (!leftOperandType.equals("Unknown") && !rightOperandType.equals("Unknown") &&
             !leftOperandType.equals("ErrorType") && !rightOperandType.equals("ErrorType")) {
             
@@ -434,22 +433,6 @@ public class Parser {
                  addSemanticError(operatorToken, "Tipo de dato no comparable.",
                                "Las comparaciones solo están permitidas para tipos 'Int' o 'String'. Tipo encontrado: '" + leftOperandType + "'.");
             }
-        }
-
-        // NUEVO: Recolectar la expresión de condición completa si sus partes son válidas.
-        // La expresión completa es desde leftExprStart hasta rightExprEnd
-        // Esto requeriría re-subList del inicio del primer operando al fin del segundo.
-        // Por simplicidad, si las sub-expresiones son válidas, consideramos la condición completa procesada.
-        // Un enfoque más robusto sería guardar la lista de tokens para la condición completa.
-        // Por ahora, solo recolectamos las sub-expresiones que componen la condición.
-        if (!leftOperandType.equals("Unknown") && !leftOperandType.equals("ErrorType")) {
-            collectExpression(tokens.subList(leftExprStart, leftExprEnd));
-        }
-        if (!rightOperandType.equals("Unknown") && !rightOperandType.equals("ErrorType")) {
-            // collectedExpressions.add(new ExpressionData(tokens.subList(rightExprStart, rightExprEnd)));
-            // No recolectamos el mismo fragmento dos veces si rightExprStart == leftExprStart (ej. "a < b" vs "a < (a + 1)")
-            // La recolección de la expresión completa de la condición es más compleja de hacer de forma ad-hoc.
-            // Para el ejercicio, nos enfocaremos en las expresiones aritméticas y los rangos for.
         }
     }
     
@@ -585,19 +568,16 @@ public class Parser {
         return e;
     }
 
-    // MODIFICADO: addSemanticError solo agrega el error, no lanza excepción
     private void addSemanticError(Token token, String generalMessage, String specificMessageToUser) {
         SemanticError e = new SemanticError(token, generalMessage, specificMessageToUser);
         errors.add(e.getMessage());
     }
 
-    // MODIFICADO: checkVariableInitialized ahora usa addSemanticError y no lanza excepción
     private void checkVariableInitialized(Token name) {
         if (!declaredVariables.contains(name.lexeme)) {
             addSemanticError(name,
                     "Variable no inicializada: " + name.lexeme,
                     "La variable '" + name.lexeme + "' se usa antes de declararla.");
-            // No se detiene el parseo aquí.
         }
     }
     
@@ -703,9 +683,9 @@ public class Parser {
         System.out.println("DEBUG: Salida de synchronizeToStatementBoundary() porque isAtEnd() es true.");
     }
 
-    // --- NUEVOS MÉTODOS PARA CÓDIGO INTERMEDIO ---
+    // --- MÉTODOS PARA CÓDIGO INTERMEDIO ---
 
-    // Prioridades de los operadores para la conversión infija a prefija
+    // Prioridades de los operadores para la conversión infija a postfija (Shunting-Yard)
     private int getOperatorPrecedence(Token.TokenType type) {
         switch (type) {
             case OP_SUMA:
@@ -714,81 +694,43 @@ public class Parser {
             case OP_MULT:
             case OP_DIV:
                 return 2;
+            case PAREN_IZQ: 
+                return 0; // Baja precedencia para PAREN_IZQ en la pila (para que no sea sacado prematuramente)
             default:
-                return 0; // Para operandos o paréntesis
+                return 0; // Para operandos o PAREN_DER (que se maneja diferente)
         }
-    }
-
-    // Método para convertir de infija a prefija (notación polaca)
-    // Devuelve la expresión prefija como una lista de tokens, y simula la pila.
-    private ExpressionConversionResult convertToPrefix(List<Token> infixTokens) {
-        Stack<Token> operators = new Stack<>();
-        List<Token> prefixTokens = new ArrayList<>();
-        List<String> stackSimulationSteps = new ArrayList<>();
-        
-        // El algoritmo de infija a prefija estándar a menudo se hace invirtiendo la expresión,
-        // convirtiendo a postfija, y luego invirtiendo de nuevo.
-        // O adaptando el algoritmo de infija a postfija.
-        // Para simplicidad y porque los cuádruplos son más fáciles desde postfija,
-        // vamos a adaptar una versión que genere prefija directamente.
-        // Una forma común es procesar de derecha a izquierda.
-        
-        // Invertimos la expresión infija para procesarla de derecha a izquierda
-        List<Token> reversedInfix = new ArrayList<>(infixTokens);
-        java.util.Collections.reverse(reversedInfix);
-
-        stackSimulationSteps.add("Inicio de conversión a prefija (derecha a izquierda)");
-        stackSimulationSteps.add("Entrada: " + tokensToString(reversedInfix));
-        stackSimulationSteps.add("Pila Operadores | Salida Prefija");
-
-        for (Token token : reversedInfix) {
-            String currentStackState = operators.toString();
-            String currentPrefixState = tokensToString(prefixTokens);
-            stackSimulationSteps.add(String.format("%-15s | %s | Procesando: %s", 
-                                                    currentStackState, currentPrefixState, token.lexeme));
-
-            if (token.type == ID || token.type == NUMERO_ENTERO || token.type == CADENA_LITERAL) {
-                prefixTokens.add(token);
-            } else if (token.type == PAREN_DER) { // Paréntesis derecho en expresión original, ahora izquierdo
-                operators.push(token);
-            } else if (token.type == PAREN_IZQ) { // Paréntesis izquierdo en expresión original, ahora derecho
-                while (!operators.isEmpty() && operators.peek().type != PAREN_DER) {
-                    prefixTokens.add(operators.pop());
-                }
-                if (!operators.isEmpty() && operators.peek().type == PAREN_DER) {
-                    operators.pop(); // Sacar el paréntesis derecho
-                }
-            } else if (isOperator(token.type)) {
-                while (!operators.isEmpty() && isOperator(operators.peek().type) && 
-                       getOperatorPrecedence(operators.peek().type) > getOperatorPrecedence(token.type)) {
-                    prefixTokens.add(operators.pop());
-                }
-                operators.push(token);
-            }
-        }
-
-        while (!operators.isEmpty()) {
-            String currentStackState = operators.toString();
-            String currentPrefixState = tokensToString(prefixTokens);
-            stackSimulationSteps.add(String.format("%-15s | %s | Vaciar pila", 
-                                                    currentStackState, currentPrefixState));
-            prefixTokens.add(operators.pop());
-        }
-        
-        // Invertimos la lista de tokens prefija para obtener el orden correcto
-        java.util.Collections.reverse(prefixTokens);
-        
-        stackSimulationSteps.add("Fin de conversión.");
-        stackSimulationSteps.add("Resultado final (invertido): " + tokensToString(prefixTokens));
-
-        return new ExpressionConversionResult(prefixTokens, stackSimulationSteps);
     }
     
-    private boolean isOperator(Token.TokenType type) {
+    // CORRECCIÓN: isArithmeticOperator solo para + - * /
+    private boolean isArithmeticOperator(Token.TokenType type) { // MODIFICADO
         return type == OP_SUMA || type == OP_RESTA || type == OP_MULT || type == OP_DIV;
     }
-    
-    private String tokensToString(List<Token> tokens) {
+
+    // CORRECCIÓN: hasArithmeticOperators (renombrado para claridad)
+    // Determina si una lista de tokens de expresión contiene operadores ARITMÉTICOS
+    private boolean hasArithmeticOperators(List<Token> tokens) { // MODIFICADO
+        if (tokens.size() <= 1) { 
+            return false;
+        }
+        for (Token t : tokens) {
+            if (isArithmeticOperator(t.type)) { // Usar el nuevo isArithmeticOperator
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // NUEVO: Método para verificar si es un solo operando de tipo aritmético
+    private boolean isSingleOperandArithmeticExpression(List<Token> tokens) {
+        if (tokens.size() == 1) {
+            Token t = tokens.get(0);
+            return (t.type == ID || t.type == NUMERO_ENTERO); // Solo ID o NUMERO_ENTERO para aritméticas
+        }
+        return false;
+    }
+
+
+    private static String tokensToString(List<Token> tokens) { 
         StringBuilder sb = new StringBuilder();
         for (Token t : tokens) {
             sb.append(t.lexeme).append(" ");
@@ -796,100 +738,227 @@ public class Parser {
         return sb.toString().trim();
     }
 
-    // Clase para el resultado de la conversión
-    private static class ExpressionConversionResult {
-        List<Token> prefixTokens;
+
+    // Clase para el resultado de la conversión (postfija)
+    private static class ExpressionConversionResult { 
+        List<Token> resultTokens; // Postfija
         List<String> stackSimulation;
 
-        public ExpressionConversionResult(List<Token> prefixTokens, List<String> stackSimulation) {
-            this.prefixTokens = prefixTokens;
+        public ExpressionConversionResult(List<Token> resultTokens, List<String> stackSimulation) {
+            this.resultTokens = resultTokens;
             this.stackSimulation = stackSimulation;
         }
     }
 
-    // NUEVO: Método para generar cuádruplos
-    private List<String> generateQuadruples(List<Token> infixTokens, List<String> stackSimulation) {
-        List<String> quadruples = new ArrayList<>();
-        Stack<Token> operandStack = new Stack<>();
-        Stack<Token> operatorStack = new Stack<>();
-        int tempVarCounter = 0;
-
-        // Para generar cuádruplos, es más natural trabajar con postfija.
-        // Podríamos convertir a postfija primero, o adaptar directamente desde infija.
-        // Adaptaremos el algoritmo Shunting-Yard para generar cuádruplos.
-        // Cada vez que un operador es sacado de la pila, se genera un cuádruplo.
-
-        quadruples.add("Generación de Cuádruplos:");
-
-        List<String> currentStackStates = new ArrayList<>();
-        currentStackStates.add("Pila Operandos | Pila Operadores | Cuádruplo Generado | Siguiente Token");
+    // Algoritmo Shunting-Yard para convertir Infija a Postfija
+    private ExpressionConversionResult convertToPostfix(List<Token> infixTokens) {
+        Stack<Token> operators = new Stack<>();
+        List<Token> postfixTokens = new ArrayList<>();
+        List<String> stackSimulationSteps = new ArrayList<>();
+        
+        stackSimulationSteps.add(String.format("%-20s | %-20s | %s", "Pila Operadores", "Salida Postfija", "Procesando"));
 
         for (Token token : infixTokens) {
-            String opStackState = operatorStack.isEmpty() ? "[]" : operatorStack.toString();
-            String valStackState = operandStack.isEmpty() ? "[]" : operandStack.toString();
-            currentStackStates.add(String.format("%-15s | %-15s | %-20s | %s", 
-                                                    valStackState, opStackState, "---", token.lexeme));
-
+            String currentStack = operators.isEmpty() ? "[]" : operators.toString();
+            String currentOutput = tokensToString(postfixTokens);
+            stackSimulationSteps.add(String.format("%-20s | %-20s | Procesando: %s", currentStack, currentOutput, token.lexeme));
 
             if (token.type == ID || token.type == NUMERO_ENTERO || token.type == CADENA_LITERAL) {
-                operandStack.push(token);
+                postfixTokens.add(token);
+                stackSimulationSteps.add(String.format("%-20s | %-20s | Operando a salida: %s", currentStack, tokensToString(postfixTokens), token.lexeme));
             } else if (token.type == PAREN_IZQ) {
-                operatorStack.push(token);
+                operators.push(token);
+                stackSimulationSteps.add(String.format("%-20s | %-20s | Push PAREN_IZQ: %s", operators.toString(), currentOutput, token.lexeme));
             } else if (token.type == PAREN_DER) {
-                while (!operatorStack.isEmpty() && operatorStack.peek().type != PAREN_IZQ) {
-                    quadruples.add(popAndGenerateQuadruple(operandStack, operatorStack, ++tempVarCounter));
+                while (!operators.isEmpty() && operators.peek().type != PAREN_IZQ) {
+                    postfixTokens.add(operators.pop());
+                    stackSimulationSteps.add(String.format("%-20s | %-20s | Pop operador: %s", operators.toString(), tokensToString(postfixTokens), previous().lexeme));
                 }
-                if (!operatorStack.isEmpty() && operatorStack.peek().type == PAREN_IZQ) {
-                    operatorStack.pop(); // Sacar el paréntesis izquierdo
+                if (!operators.isEmpty() && operators.peek().type == PAREN_IZQ) {
+                    operators.pop(); // Sacar el PAREN_IZQ de la pila
+                    stackSimulationSteps.add(String.format("%-20s | %-20s | Pop PAREN_IZQ", operators.toString(), currentOutput));
+                } else {
+                    stackSimulationSteps.add(String.format("%-20s | %-20s | ERROR: Paréntesis no balanceados", operators.toString(), currentOutput));
                 }
-            } else if (isOperator(token.type)) {
-                while (!operatorStack.isEmpty() && isOperator(operatorStack.peek().type) && 
-                       getOperatorPrecedence(operatorStack.peek().type) >= getOperatorPrecedence(token.type)) { // >= para asociatividad izquierda
-                    quadruples.add(popAndGenerateQuadruple(operandStack, operatorStack, ++tempVarCounter));
+            } else if (isArithmeticOperator(token.type)) { // CORRECCIÓN: usar isArithmeticOperator
+                while (!operators.isEmpty() && operators.peek().type != PAREN_IZQ && 
+                       getOperatorPrecedence(operators.peek().type) >= getOperatorPrecedence(token.type)) {
+                    postfixTokens.add(operators.pop());
+                    stackSimulationSteps.add(String.format("%-20s | %-20s | Pop operador (mayor/igual prec.): %s", operators.toString(), tokensToString(postfixTokens), previous().lexeme));
                 }
-                operatorStack.push(token);
+                operators.push(token);
+                stackSimulationSteps.add(String.format("%-20s | %-20s | Push operador: %s", operators.toString(), currentOutput, token.lexeme));
+            }
+            // NOTA: Los operadores relacionales NO se manejan aquí para postfija aritmética
+        }
+
+        while (!operators.isEmpty()) {
+            if (operators.peek().type == PAREN_IZQ || operators.peek().type == PAREN_DER) {
+                 stackSimulationSteps.add(String.format("%-20s | %-20s | ERROR: Paréntesis no balanceados al final", operators.toString(), tokensToString(postfixTokens)));
+                 operators.pop(); 
+            } else {
+                postfixTokens.add(operators.pop());
+                stackSimulationSteps.add(String.format("%-20s | %-20s | Pop final: %s", operators.toString(), tokensToString(postfixTokens), previous().lexeme));
             }
         }
+        
+        stackSimulationSteps.add("Fin de conversión a Postfija.");
+        stackSimulationSteps.add("Resultado Postfija: " + tokensToString(postfixTokens));
 
-        while (!operatorStack.isEmpty()) {
-            quadruples.add(popAndGenerateQuadruple(operandStack, operatorStack, ++tempVarCounter));
+        return new ExpressionConversionResult(postfixTokens, stackSimulationSteps);
+    }
+    
+    // Método para convertir Postfija a Prefija
+    private List<Token> convertPostfixToPrefix(List<Token> postfixTokens) {
+        Stack<List<Token>> stack = new Stack<>();
+
+        for (Token token : postfixTokens) {
+            if (token.type == ID || token.type == NUMERO_ENTERO || token.type == CADENA_LITERAL) {
+                List<Token> operand = new ArrayList<>();
+                operand.add(token);
+                stack.push(operand);
+            } else if (isArithmeticOperator(token.type)) { // CORRECCIÓN: usar isArithmeticOperator
+                // Asegurar que la pila tenga suficientes operandos antes de pop
+                if (stack.size() < 2) {
+                    // Esto indica un problema con la postfija, quizás mal formada.
+                    // Podríamos añadir un error, pero el parseo ya lo validó.
+                    // Para evitar RuntimeException, simplemente saltamos o manejamos con un mensaje de error.
+                    // Por ahora, simplemente retornamos lo que tengamos si la pila está mal.
+                    // Una postfija válida siempre tendrá suficientes operandos.
+                    return new ArrayList<>(); 
+                }
+                List<Token> operand2 = stack.pop();
+                List<Token> operand1 = stack.pop();
+                
+                List<Token> expression = new ArrayList<>();
+                expression.add(token); // Operador primero
+                expression.addAll(operand1);
+                expression.addAll(operand2);
+                stack.push(expression);
+            }
+        }
+        if (stack.isEmpty()) return new ArrayList<>(); // Si la pila está vacía (expresión vacía o error)
+        return stack.pop();
+    }
+
+    // Clase para el resultado de la generación de cuádruplos
+    private static class QuadrupleGenerationResult {
+        List<String> quadruples;
+        List<String> stackSimulation;
+
+        public QuadrupleGenerationResult(List<String> quadruples, List<String> stackSimulation) {
+            this.quadruples = quadruples;
+            this.stackSimulation = stackSimulation;
+        }
+    }
+
+    // Método para generar cuádruplos desde Postfija
+    private QuadrupleGenerationResult generateQuadruples(List<Token> postfixTokens, String finalTarget) { // NUEVO: finalTarget
+        List<String> quadruples = new ArrayList<>();
+        Stack<String> operandStack = new Stack<>(); 
+        List<String> quadrupleStackSimulationSteps = new ArrayList<>();
+        int tempVarCounter = 0;
+
+        quadrupleStackSimulationSteps.add(String.format("%-20s | %-15s | %s", "Pila Operandos", "Siguiente Token", "Cuádruplo Generado"));
+
+        for (Token token : postfixTokens) {
+            String currentOperandStack = operandStack.isEmpty() ? "[]" : operandStack.toString();
+            String generatedQuad = "---";
+
+            if (token.type == ID || token.type == NUMERO_ENTERO || token.type == CADENA_LITERAL) {
+                operandStack.push(token.lexeme);
+                generatedQuad = "Operando empujado";
+            } else if (isArithmeticOperator(token.type)) { // CORRECCIÓN: usar isArithmeticOperator
+                if (operandStack.size() < 2) {
+                    quadrupleStackSimulationSteps.add(String.format("%-20s | %-15s | ERROR: Pila insuficiente para operador %s. Cuádruplos incompletos.", currentOperandStack, token.lexeme, token.lexeme));
+                    return new QuadrupleGenerationResult(new ArrayList<>(), quadrupleStackSimulationSteps); // Detener y reportar error
+                }
+                String arg2 = operandStack.pop();
+                String arg1 = operandStack.pop();
+                
+                String tempVar = "t" + (++tempVarCounter);
+                String quad = String.format("%s = %s %s %s", tempVar, arg1, token.lexeme, arg2); // Formato tX = arg1 op arg2
+                quadruples.add(quad);
+                operandStack.push(tempVar); 
+                generatedQuad = quad;
+            }
+            quadrupleStackSimulationSteps.add(String.format("%-20s | %-15s | %s", currentOperandStack, token.lexeme, generatedQuad));
         }
 
-        // Simulación de la pila para cuádruplos también
-        stackSimulation.addAll(currentStackStates); // Añadir los estados de la pila para cuádruplos también.
+        // Al final, si queda un resultado en la pila, es el valor final de la expresión
+        if (!operandStack.isEmpty() && finalTarget != null) {
+            String finalResult = operandStack.pop();
+            // Si el resultado final no es una temporal (ej. es un literal o ID simple)
+            // y el target es una variable real, generamos la asignación
+            if (!finalResult.startsWith("t") || finalTarget.equals("print_target") || finalTarget.equals("range_start") || finalTarget.equals("range_end")) {
+                 quadruples.add(String.format("%s = %s", finalTarget, finalResult));
+            } else {
+                // Si finalResult ya es una temporal (tX) y finalTarget es un nombre de variable,
+                // la asignación es var = tX
+                if (!finalTarget.startsWith("t")) { // Evitar tX = tY
+                    quadruples.add(String.format("%s = %s", finalTarget, finalResult));
+                }
+            }
+            // Asegurarse de que el target para print, range_start, range_end no sea realmente el nombre de una variable.
+            if (finalTarget.equals("print_target")) {
+                quadruples.add(0, String.format("PRINT %s", finalResult)); // Cuádruplo especial para print
+            } else if (finalTarget.equals("range_start")) {
+                quadruples.add(String.format("RANGE_START %s", finalResult)); // Cuádruplo especial para inicio de rango
+            } else if (finalTarget.equals("range_end")) {
+                quadruples.add(String.format("RANGE_END %s", finalResult)); // Cuádruplo especial para fin de rango
+            }
+        }
         
-        return quadruples;
+        return new QuadrupleGenerationResult(quadruples, quadrupleStackSimulationSteps);
     }
-
-    private String popAndGenerateQuadruple(Stack<Token> operandStack, Stack<Token> operatorStack, int tempVarNum) {
-        Token op = operatorStack.pop();
-        Token right = operandStack.pop();
-        Token left = operandStack.pop();
-        
-        String tempVar = "t" + tempVarNum;
-        String quad = String.format("op: %s, arg1: %s, arg2: %s, result: %s",
-                                    op.lexeme, left.lexeme, right.lexeme, tempVar);
-        
-        operandStack.push(new Token(ID, tempVar, null, 0, 0)); // Empujar la variable temporal como operando
-        return quad;
-    }
-
-
-    // NUEVO: Método para recolectar y procesar una expresión válida
-    private void collectExpression(List<Token> exprTokens) {
-        if (exprTokens.isEmpty()) return;
+    
+    // Método para recolectar y procesar una expresión válida
+    // Ahora recibe el target final de la expresión (ej. nombre de variable o "print_target")
+    private void collectExpression(List<Token> exprTokens, String expressionType, String finalTarget) { // MODIFICADO
+        if (exprTokens.isEmpty() || expressionType.equals("Unknown") || expressionType.equals("ErrorType")) {
+            return;
+        }
 
         ExpressionData data = new ExpressionData(exprTokens);
         
-        // Conversión a prefija
-        ExpressionConversionResult prefixResult = convertToPrefix(exprTokens);
-        data.prefixExpression = tokensToString(prefixResult.prefixTokens);
-        data.stackSimulation = prefixResult.stackSimulation; // Simulación de pila para prefija
+        // Expresiones de un solo operando (ej. "a", "10", "\"hola\"")
+        // Generar un cuádruplo de asignación a una temporal o directamente al target.
+        if (!hasArithmeticOperators(exprTokens) && isSingleOperandArithmeticExpression(exprTokens)) { // Modificado: verificar hasArithmeticOperators
+            String operand = exprTokens.get(0).lexeme;
+            data.prefixExpression = operand; 
+            data.postFixTokensString.add(operand); 
+            // Para un solo operando, la "operación" es simplemente asignarlo al target
+            if (finalTarget != null) {
+                if (finalTarget.equals("print_target")) { // Caso especial para print
+                    data.quadruples.add(String.format("PRINT %s", operand));
+                    data.quadrupleStackSimulation.add(String.format("[] | %-15s | PRINT %s", operand, operand));
+                } else if (finalTarget.equals("range_start")) {
+                    data.quadruples.add(String.format("RANGE_START %s", operand));
+                    data.quadrupleStackSimulation.add(String.format("[] | %-15s | RANGE_START %s", operand, operand));
+                } else if (finalTarget.equals("range_end")) {
+                    data.quadruples.add(String.format("RANGE_END %s", operand));
+                    data.quadrupleStackSimulation.add(String.format("[] | %-15s | RANGE_END %s", operand, operand));
+                } else { // Asignación a una variable
+                    data.quadruples.add(String.format("%s = %s", finalTarget, operand));
+                    data.quadrupleStackSimulation.add(String.format("[] | %-15s | %s = %s", operand, operand, finalTarget, operand));
+                }
+            }
+        } else { // Expresiones con operadores
+            // 1. Convertir a Postfija (Shunting-Yard)
+            ExpressionConversionResult postfixResult = convertToPostfix(exprTokens);
+            List<Token> postfixTokens = postfixResult.resultTokens;
+            data.postFixTokensString = postfixTokens.stream().map(t -> t.lexeme).collect(Collectors.toList());
+            data.prefixStackSimulation = postfixResult.stackSimulation; 
 
-        // Generación de cuádruplos (requiere una pila limpia para operandos/operadores)
-        // La simulación de pila para cuádruplos se puede fusionar con la anterior o ser independiente.
-        // Aquí pasamos la lista de pasos para que los cuádruplos puedan añadir sus propios pasos.
-        data.quadruples = generateQuadruples(exprTokens, data.stackSimulation);
+            // 2. Convertir Postfija a Prefija
+            List<Token> prefixResultTokens = convertPostfixToPrefix(postfixTokens);
+            data.prefixExpression = tokensToString(prefixResultTokens);
+            
+            // 3. Generación de cuádruplos desde la Postfija
+            QuadrupleGenerationResult quadResult = generateQuadruples(postfixTokens, finalTarget); // Pasar finalTarget
+            data.quadruples = quadResult.quadruples;
+            data.quadrupleStackSimulation = quadResult.stackSimulation;
+        }
         
         collectedExpressions.add(data);
     }
