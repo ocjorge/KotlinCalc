@@ -42,8 +42,8 @@ public class Parser {
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("  Original (Infija): ").append(Parser.tokensToString(infixTokens)).append("\n"); 
-            sb.append("  Notación Postfija (Shunting-Yard): ").append(String.join(" ", postFixTokensString)).append("\n"); 
-            sb.append("  Simulación Pila (Infija a Postfija):\n");
+            sb.append("  Notación prefija: ").append(String.join(" ", postFixTokensString)).append("\n"); 
+            sb.append("  Simulación Pila (Infija a Prefija):\n");
             if (prefixStackSimulation.isEmpty()) { 
                 sb.append("    (No aplica para expresiones de un solo operando o sin operadores complejos)\n");
             } else {
