@@ -10,7 +10,12 @@ Lenguajes y Automatas II
 Profa: Martínez Moreno Martha
 
 Descripción: programa que maneja etapas lexica, 
-sintactica, semantica por validación de entradas.
+sintactica, semantica por validación de entradas
+Transformación de expresiones aritmeticas de
+infija a prefija, uso de cuadruplos en el 
+algoritmo de traducción y conversión por partes
+
+Branch: Prefija.
 
 
 */
