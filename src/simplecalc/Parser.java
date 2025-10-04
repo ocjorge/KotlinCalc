@@ -1,4 +1,6 @@
 package simplecalc;
+ //(Versión con Simulación de Valores Acumulativos)
+
 
 import java.util.List;
 import java.util.ArrayList;
