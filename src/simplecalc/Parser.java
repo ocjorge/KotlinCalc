@@ -17,7 +17,7 @@ public class Parser {
     private List<String> errors = new ArrayList<>();
     private Set<String> declaredVariables = new HashSet<>();
     private Map<String, String> variableTypes = new HashMap<>(); 
-    private Map<String, Integer> variableValues = new HashMap<>(); // NUEVO: Para simular valores numéricos
+    private Map<String, Integer> variableValues = new HashMap<>(); // NUEVO: Para almacenar los valores numéricos actuales de las variables
 
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
     
@@ -25,10 +25,10 @@ public class Parser {
     public static class ExpressionData { 
         List<Token> infixTokens;
         String prefixExpression;
-        List<String> prefixStackSimulation; // Simulación de pila para infija a prefija
+        List<String> prefixStackSimulation; 
         List<String> quadruples; 
-        List<String> quadrupleStackSimulation; // Simulación de pila para cuádruplos
-        Map<String, Integer> numericResultsSimulation; // NUEVO: Para resultados numéricos
+        List<String> quadrupleStackSimulation; 
+        Map<String, Integer> numericResultsSimulation; // Para resultados numéricos de ESTA expresión y temporales
 
         public ExpressionData(List<Token> infixTokens) {
             this.infixTokens = new ArrayList<>(infixTokens); 
@@ -36,7 +36,7 @@ public class Parser {
             this.prefixStackSimulation = new ArrayList<>(); 
             this.quadruples = new ArrayList<>();
             this.quadrupleStackSimulation = new ArrayList<>();
-            this.numericResultsSimulation = new HashMap<>(); // Inicializar el mapa
+            this.numericResultsSimulation = new HashMap<>(); 
         }
 
         @Override
@@ -44,7 +44,7 @@ public class Parser {
             StringBuilder sb = new StringBuilder();
             sb.append("  Original (Infija): ").append(Parser.tokensToString(infixTokens)).append("\n"); 
             sb.append("  Simulación Pila (Infija a Prefija):\n");
-            if (prefixStackSimulation.isEmpty() || prefixStackSimulation.size() <= 1) { // Mejorar para expresiones simples
+            if (prefixStackSimulation.isEmpty() || prefixStackSimulation.size() <= 1) { 
                 sb.append("    (No aplica / Trivial para esta expresión)\n");
             } else {
                 for (String step : prefixStackSimulation) {
@@ -64,7 +64,7 @@ public class Parser {
             }
             
             sb.append("  Simulación Pila (Generación Cuádruplos desde Infija):\n"); 
-            if (quadrupleStackSimulation.isEmpty() || quadrupleStackSimulation.size() <= 1) { // Mejorar para expresiones simples
+            if (quadrupleStackSimulation.isEmpty() || quadrupleStackSimulation.size() <= 1) { 
                 sb.append("    (No aplica / Trivial para esta expresión)\n");
             } else {
                 for (String step : quadrupleStackSimulation) {
@@ -72,7 +72,6 @@ public class Parser {
                 }
             }
             
-            // NUEVO: Mostrar resultados numéricos
             if (!numericResultsSimulation.isEmpty()) {
                 sb.append("  Resultados Numéricos (Simulación):\n");
                 numericResultsSimulation.forEach((var, val) -> sb.append(String.format("    %s = %d\n", var, val)));
@@ -99,7 +98,7 @@ public class Parser {
         errors.clear();
         declaredVariables.clear();
         variableTypes.clear(); 
-        variableValues.clear(); // Limpiar valores numéricos
+        variableValues.clear(); // ¡Reiniciar valores de variables al inicio de cada parseo!
         collectedExpressions.clear(); 
         
         try {
@@ -295,10 +294,10 @@ public class Parser {
         int exprEnd = current;
         
         // Recolectamos la expresión si es aritmética y válida.
-        // Solo si el tipo es Int. Si es String, no genera cuádruplos aritméticos.
-        if (!exprType.equals("Unknown") && !exprType.equals("ErrorType") && exprType.equals("Int")) {
+        // Solo si el tipo es Int o una cadena literal simple (para PRINT).
+        if (!exprType.equals("Unknown") && !exprType.equals("ErrorType") && (exprType.equals("Int") || (exprType.equals("String") && tokens.subList(exprStart, exprEnd).size() == 1 && tokens.subList(exprStart, exprEnd).get(0).type == CADENA_LITERAL))) {
             List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens) || (subExprTokens.size() == 1 && subExprTokens.get(0).type == CADENA_LITERAL)) { 
                  collectExpression(subExprTokens, "print_target"); // Target especial para "print"
             }
         }
@@ -372,7 +371,7 @@ public class Parser {
         String rangeStartType = expresion_aritmetica(); 
         int rangeStartExprEnd = current;
         checkTypeCompatibility("Int", rangeStartType, previous());
-        if (!rangeStartType.equals("Unknown") && !rangeStartType.equals("ErrorType")) {
+        if (!rangeStartType.equals("Unknown") && !rangeStartType.equals("ErrorType") && rangeStartType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeStartExprStart, rangeStartExprEnd);
             if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
                 collectExpression(subExprTokens, "range_start"); // Target especial
@@ -386,7 +385,7 @@ public class Parser {
         String rangeEndType = expresion_aritmetica(); 
         int rangeEndExprEnd = current;
         checkTypeCompatibility("Int", rangeEndType, previous());
-        if (!rangeEndType.equals("Unknown") && !rangeEndType.equals("ErrorType")) {
+        if (!rangeEndType.equals("Unknown") && !rangeEndType.equals("ErrorType") && rangeEndType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeEndExprStart, rangeEndExprEnd);
             if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
                 collectExpression(subExprTokens, "range_end"); // Target especial
@@ -694,11 +693,6 @@ public class Parser {
     // --- MÉTODOS PARA CÓDIGO INTERMEDIO ---
 
     // Prioridades de los operadores para la conversión infija a prefija (procesando de derecha a izquierda)
-    // NOTA: Para infija a prefija procesando DE DERECHA A IZQUIERDA, las reglas de precedencia se invierten
-    // si el operador es de asociatividad izquierda (como + o -). Pero para la simulación
-    // de Shunting-Yard inverso, es más fácil usar la precedencia normal.
-    // Usaremos la precedencia normal aquí, pero el algoritmo convertToPrefix lo manejará
-    // con su lógica de derecha a izquierda o Shunting-Yard inverso.
     private int getOperatorPrecedence(Token.TokenType type) {
         switch (type) {
             case OP_SUMA:
@@ -779,7 +773,7 @@ public class Parser {
             String currentOutput = tokensToString(prefixTokensReversed);
             stackSimulationSteps.add(String.format("%-20s | %-20s | Token: %s", currentStack, currentOutput, token.lexeme));
 
-            if (token.type == ID || token.type == NUMERO_ENTERO || token.type == CADENA_LITERAL) {
+            if (token.type == ID || token.type == NUMERO_ENTERO) { // Solo operandos aritméticos relevantes
                 prefixTokensReversed.add(token);
                 stackSimulationSteps.add(String.format("%-20s | %-20s | Operando a salida: %s", currentStack, tokensToString(prefixTokensReversed), token.lexeme));
             } else if (isArithmeticOperator(token.type)) {
@@ -854,7 +848,8 @@ public class Parser {
         Stack<String> operandStack = new Stack<>(); // Guarda operandos (literales, IDs, temporales)
         Stack<Token> operatorStack = new Stack<>(); // Guarda operadores
         List<String> quadrupleStackSimulationSteps = new ArrayList<>();
-        Map<String, Integer> currentNumericValues = new HashMap<>(variableValues); // Copiar valores de variables globales
+        Map<String, Integer> currentNumericValues = new HashMap<>(variableValues); // Copiar valores PERSISTENTES del parser
+
         int tempVarCounter = 0;
 
         quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | %s", "Pila Operandos", "Pila Operadores", "Token", "Cuádruplo Generado"));
@@ -882,8 +877,8 @@ public class Parser {
                     String tempVar = "t" + (++tempVarCounter);
                     
                     // Simular cálculo numérico
-                    int val1 = getValue(arg1, currentNumericValues);
-                    int val2 = getValue(arg2, currentNumericValues);
+                    int val1 = getNumericValueForSimulation(arg1, currentNumericValues); // Usar auxiliar
+                    int val2 = getNumericValueForSimulation(arg2, currentNumericValues); // Usar auxiliar
                     int result = evaluate(val1, val2, op.type);
                     currentNumericValues.put(tempVar, result); // Almacenar resultado temporal
                     
@@ -911,8 +906,8 @@ public class Parser {
                     String tempVar = "t" + (++tempVarCounter);
 
                     // Simular cálculo numérico
-                    int val1 = getValue(arg1, currentNumericValues);
-                    int val2 = getValue(arg2, currentNumericValues);
+                    int val1 = getNumericValueForSimulation(arg1, currentNumericValues); // Usar auxiliar
+                    int val2 = getNumericValueForSimulation(arg2, currentNumericValues); // Usar auxiliar
                     int result = evaluate(val1, val2, op.type);
                     currentNumericValues.put(tempVar, result); // Almacenar resultado temporal
 
@@ -950,8 +945,8 @@ public class Parser {
             String tempVar = "t" + (++tempVarCounter);
 
             // Simular cálculo numérico
-            int val1 = getValue(arg1, currentNumericValues);
-            int val2 = getValue(arg2, currentNumericValues);
+            int val1 = getNumericValueForSimulation(arg1, currentNumericValues); // Usar auxiliar
+            int val2 = getNumericValueForSimulation(arg2, currentNumericValues); // Usar auxiliar
             int result = evaluate(val1, val2, op.type);
             currentNumericValues.put(tempVar, result); // Almacenar resultado temporal
 
@@ -965,59 +960,68 @@ public class Parser {
                                                             op.lexeme, quad + " (Resultado: " + result + ")"));
         }
 
-        // Asignación final al target si es aplicable y el resultado es numérico
+        // Asignación final al target si es aplicable
         if (!operandStack.isEmpty()) {
             String finalExpressionResult = operandStack.pop();
-            // Asegurarse de que el resultado final es un valor numérico o una temporal que lo contiene
-            if (!currentNumericValues.containsKey(finalExpressionResult) && !isNumericLiteral(finalExpressionResult) && !variableValues.containsKey(finalExpressionResult)) {
-                // No se puede simular el resultado numérico si no es numérico
-                // Esto podría ser un ID sin valor numérico o una cadena.
-                 currentNumericValues.put(finalExpressionResult, null); // Indicar que no se pudo calcular
-            } else {
-                 int finalVal = getValue(finalExpressionResult, currentNumericValues);
-                 currentNumericValues.put(finalTarget, finalVal); // El valor final de la expresión se asigna al target.
-            }
-
             if (finalTarget != null) {
-                // Si el target es una variable o un destino especial (print, range)
-                String finalResultValue = finalExpressionResult;
+                // Actualizar el valor de la variable en la tabla de valores PERSISTENTE del parser
+                int finalCalculatedValue = getNumericValueForSimulation(finalExpressionResult, currentNumericValues);
+                
                 if (finalTarget.equals("print_target")) { 
-                    quadruples.add(String.format("PRINT %s", finalResultValue)); 
+                    quadruples.add(String.format("PRINT %s", finalExpressionResult)); 
+                    // No se actualiza variableValues para print_target
                 } else if (finalTarget.equals("range_start")) {
-                    quadruples.add(String.format("RANGE_START %s", finalResultValue)); 
+                    quadruples.add(String.format("RANGE_START %s", finalExpressionResult)); 
                 } else if (finalTarget.equals("range_end")) {
-                    quadruples.add(String.format("RANGE_END %s", finalResultValue)); 
-                } else { // Asignación a una variable
-                    quadruples.add(String.format("%s = %s", finalTarget, finalResultValue));
-                    // Actualizar el valor de la variable en la tabla de valores
-                    try {
-                        currentNumericValues.put(finalTarget, getValue(finalResultValue, currentNumericValues));
-                    } catch (NumberFormatException e) {
-                        // Si no es un número, no se actualiza el valor numérico
-                    }
+                    quadruples.add(String.format("RANGE_END %s", finalExpressionResult)); 
+                } else { // Es una variable a la que se asigna
+                    quadruples.add(String.format("%s = %s", finalTarget, finalExpressionResult));
+                    variableValues.put(finalTarget, finalCalculatedValue); // ¡Actualizar el valor persistente!
                 }
                 quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | Asignación final: %s = %s", 
                                                                 "[]", "[]", "FINAL", finalTarget, finalExpressionResult));
+            }
+        } else if (!infixTokens.isEmpty() && quadruples.isEmpty() && finalTarget != null) {
+            // Este caso es para expresiones de un solo operando (ID o NUMERO) que no se procesaron en el loop principal
+            // Ej: `val x: Int = 10` o `print(y)`
+            String operand = tokensToString(infixTokens); 
+            int finalCalculatedValue = getNumericValueForSimulation(operand, currentNumericValues);
+
+            if (finalTarget.equals("print_target")) {
+                 quadruples.add(String.format("PRINT %s", operand));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | PRINT %s", operand, operand));
+            } else if (finalTarget.equals("range_start")) {
+                 quadruples.add(String.format("RANGE_START %s", operand));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_START %s", operand, operand));
+            } else if (finalTarget.equals("range_end")) {
+                 quadruples.add(String.format("RANGE_END %s", operand));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_END %s", operand, operand));
+            } else { // Asignación a una variable
+                 quadruples.add(String.format("%s = %s", finalTarget, operand));
+                 variableValues.put(finalTarget, finalCalculatedValue); // ¡Actualizar el valor persistente!
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | %s = %s", operand, finalTarget, operand));
             }
         }
         
         return new QuadrupleGenerationResult(quadruples, quadrupleStackSimulationSteps, currentNumericValues);
     }
     
-    // NUEVO: Método auxiliar para obtener el valor numérico de un operando
-    private int getValue(String operand, Map<String, Integer> currentNumericValues) {
+    // NUEVO: Método auxiliar para obtener el valor numérico de un operando para la simulación
+    // Busca en la tabla de valores de la expresión (temporales) o en los valores persistentes de variables
+    private int getNumericValueForSimulation(String operand, Map<String, Integer> currentNumericValues) {
         try {
             return Integer.parseInt(operand); // Si es un literal numérico
         } catch (NumberFormatException e) {
-            if (currentNumericValues.containsKey(operand)) { // Si es una variable temporal o declarada
+            if (currentNumericValues.containsKey(operand)) { // Si es una variable temporal o declarada en esta expresión
                 Integer val = currentNumericValues.get(operand);
-                return (val != null) ? val : 0; // Devolver 0 si el valor es null (no calculado)
+                return (val != null) ? val : 0; // Devolver 0 si el valor es null (no calculado o error)
             }
-            if (variableValues.containsKey(operand)) { // Si es una variable global declarada
-                return variableValues.get(operand);
+            if (variableValues.containsKey(operand)) { // Si es una variable declarada con valor persistente
+                Integer val = variableValues.get(operand);
+                return (val != null) ? val : 0; // Devolver 0 si el valor es null
             }
             // Si es un ID sin valor numérico aún, devolver 0 (o lanzar error si no se espera)
-            return 0;
+            return 0; // Podrías lanzar un SemanticError si un ID no tiene valor
         }
     }
 
@@ -1029,7 +1033,6 @@ public class Parser {
             case OP_MULT: return val1 * val2;
             case OP_DIV: 
                 if (val2 == 0) {
-                    // Manejo de división por cero - para simulación, podemos devolver 0 o un valor específico
                     System.err.println("ADVERTENCIA: División por cero detectada en simulación.");
                     return 0; 
                 }
@@ -1038,48 +1041,13 @@ public class Parser {
         }
     }
 
-    // NUEVO: Método auxiliar para saber si una cadena es un literal numérico
-    private boolean isNumericLiteral(String s) {
-        try {
-            Integer.parseInt(s);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
 
     // Método para recolectar y procesar una expresión válida
     private void collectExpression(List<Token> exprTokens, String finalTarget) { 
         if (exprTokens.isEmpty()) return;
 
-        // Filtramos para asegurarnos de que la expresión sea realmente aritmética y no una simple cadena literal si no es parte de una suma
         boolean isArithmetic = hasArithmeticOperators(exprTokens) || isSingleArithmeticOperand(exprTokens);
         
-        // Excluimos las concatenaciones de cadenas del código intermedio aritmético
-        boolean isStringConcatenation = false; 
-        if (hasArithmeticOperators(exprTokens)) { // Solo para expresiones con operadores
-             // Para esta fase, asumimos que hasArithmeticOperators ya filtró los strings correctamente
-             // Y que exprType ya fue validado a "Int".
-             // Si exprType fuera "String" y el operador fuera "+", sería una concatenación.
-             // Pero el filtro de `declaredType.equals("Int")` ya debería manejar esto antes.
-             // Aquí confirmamos que si es una cadena, no se procesa aritméticamente.
-             String exprTypeCheck = "";
-             if (exprTokens.size() == 1 && exprTokens.get(0).type == CADENA_LITERAL) {
-                 exprTypeCheck = "String";
-             } else if (isSingleArithmeticOperand(exprTokens) || hasArithmeticOperators(exprTokens)) {
-                 exprTypeCheck = "Int"; // Asumimos que la expresión ya fue validada como Int
-             }
-
-             if (exprTypeCheck.equals("String") && hasArithmeticOperators(exprTokens)) {
-                 // Si la expresión es String y tiene operadores, es una concatenación.
-                 // EXCLUIR de cuádruplos aritméticos según la petición.
-                 return;
-             }
-        }
-        
-        // Si no es una expresión aritmética (simple o compleja) no la procesamos.
-        // Las cadenas literales sueltas no generan cuádruplos.
         if (!isArithmetic) { 
             // Caso especial: print de una cadena literal simple
             if (exprTokens.size() == 1 && exprTokens.get(0).type == CADENA_LITERAL && finalTarget.equals("print_target")) {
@@ -1091,7 +1059,7 @@ public class Parser {
                 collectedExpressions.add(data);
                 return;
             }
-            return;
+            return; // No procesar si no es aritmética ni el caso especial de print de cadena.
         }
 
         ExpressionData data = new ExpressionData(exprTokens);
