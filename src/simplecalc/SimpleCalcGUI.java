@@ -60,7 +60,7 @@ public class SimpleCalcGUI extends JFrame {
                 "        print(y * 10)\n" +
                 "        print(\"\\n\")\n" +
                 "    }\n" +
-                "    val mensaje: String = \"Resultado: \" + c\n" +
+                "    val mensaje: String = \"Resultado: \"  \n" +
                 "    print(mensaje)\n" +
                 "    print(\"\\n\")\n" +
                 "    val cadenaSimple: String = \"Solo texto\"\n" +
