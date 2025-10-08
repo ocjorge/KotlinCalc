@@ -55,11 +55,6 @@ public class SimpleCalcGUI extends JFrame {
                 "        print(x)\n" +
                 "        print(\"\\n\")\n" +
                 "    }\n" +
-                "    for (y in 1..2) {\n" +
-                "        print(\"y en for: \")\n" +
-                "        print(y * 10)\n" +
-                "        print(\"\\n\")\n" +
-                "    }\n" +
                 "    val mensaje: String = \"Resultado: \"  \n" +
                 "    print(mensaje)\n" +
                 "    print(\"\\n\")\n" +
