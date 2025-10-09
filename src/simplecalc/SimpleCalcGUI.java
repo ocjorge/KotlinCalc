@@ -421,7 +421,8 @@ public class SimpleCalcGUI extends JFrame {
             } else {
                 for (int i = 0; i < expressions.size(); i++) {
                     Parser.ExpressionData data = expressions.get(i);
-                    sb.append("Expresión #").append(i + 1).append(":\n");
+                    sb.append("Expresión #").append(i + 1).append(" ");
+                    sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
                 }
             }
