@@ -55,12 +55,7 @@ public class SimpleCalcGUI extends JFrame {
                 "        print(x)\n" +
                 "        print(\"\\n\")\n" +
                 "    }\n" +
-                "    for (y in 1..2) {\n" +
-                "        print(\"y en for: \")\n" +
-                "        print(y * 10)\n" +
-                "        print(\"\\n\")\n" +
-                "    }\n" +
-                "    val mensaje: String = \"Resultado: \" + c\n" +
+                "    val mensaje: String = \"Resultado: \"  \n" +
                 "    print(mensaje)\n" +
                 "    print(\"\\n\")\n" +
                 "    val cadenaSimple: String = \"Solo texto\"\n" +
@@ -426,7 +421,8 @@ public class SimpleCalcGUI extends JFrame {
             } else {
                 for (int i = 0; i < expressions.size(); i++) {
                     Parser.ExpressionData data = expressions.get(i);
-                    sb.append("Expresión #").append(i + 1).append(":\n");
+                    sb.append("Expresión #").append(i + 1).append(" ");
+                    sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
                 }
             }
