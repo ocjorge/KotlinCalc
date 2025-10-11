@@ -14,6 +14,9 @@ sintactica, semantica por validación de entradas
 Transformación de expresiones aritmeticas de
 infija a prefija, uso de cuadruplos en el 
 algoritmo de traducción y conversión por partes
+Generacón de código intermedio en expresiones 
+aritmeticas, transormado de infija a prefija, 
+uso de cuadruplos, y manejo temporal de variables
 
 Branch: Prefija.
 
