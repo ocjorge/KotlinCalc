@@ -485,7 +485,7 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
         sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
-        sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
+        sb.append("  Tiempo de procesamiento del Parser (sin optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
         sb.append("  Total de Cuádruplos generados: ").append(lastTotalQuadruples).append("\n");
         sb.append("  Máximo de Variables Temporales distintas: ").append(lastUniqueTempVars).append("\n");
         sb.append("\nPara obtener métricas actualizadas, genere el código intermedio primero.\n");
