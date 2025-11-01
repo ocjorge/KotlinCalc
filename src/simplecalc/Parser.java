@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Stack; 
 import static simplecalc.Token.TokenType.*;
 import java.util.stream.Collectors; 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Parser {
 
@@ -21,9 +23,6 @@ public class Parser {
 
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
     
-    // NUEVO: Contador de operaciones plegadas
-    public int foldedOperationsCount; // Hacemos que sea público para que la GUI lo lea
-
     // Clase auxiliar para almacenar los datos de cada expresión
     public static class ExpressionData { 
         List<Token> infixTokens;
@@ -105,7 +104,6 @@ public class Parser {
         variableTypes.clear(); 
         variableValues.clear(); 
         collectedExpressions.clear(); 
-        foldedOperationsCount = 0; // Reiniciar contador de optimizaciones
         
         try {
             programa();
@@ -370,7 +368,7 @@ public class Parser {
         }
         declaredVariables.add(loopVarName.lexeme); 
         variableTypes.put(loopVarName.lexeme, "Int"); 
-        System.out.println("DEBUG for_stmt: Declarando variable de bucle: " + loopVarName.lexeme + " de tipo: Int"); 
+        System.out.println("DEBUG for_stmt: Declarando variable de bucle: " + loopVarName.lexeme + " de tipo: Int");
 
 
         consume(IN_KEYWORD, "Se esperaba 'in' después del nombre de la variable en 'for'.");
@@ -713,9 +711,9 @@ public class Parser {
             case OP_DIV:
                 return 2;
             case PAREN_IZQ: 
-                return 0; // Baja precedencia para PAREN_IZQ en la pila (para que no sea sacado prematuramente)
+                return 0; 
             default:
-                return 0; // Para operandos o PAREN_DER (que se maneja diferente)
+                return 0; 
         }
     }
     
@@ -869,7 +867,7 @@ public class Parser {
         for (Token token : infixTokens) {
             String opStackState = operatorStack.isEmpty() ? "[]" : operatorStack.toString();
             String valStackState = operandStack.isEmpty() ? "[]" : operandStack.toString();
-            String generatedQuadForSim = "---"; // Inicializado para cada iteración
+            String generatedQuadForSim = "---"; // Inicializado para cada iteración del bucle for
 
             if (token.type == ID || token.type == NUMERO_ENTERO) { // Solo operandos aritméticos (ID, NUMERO)
                 operandStack.push(token.lexeme);
@@ -970,7 +968,7 @@ public class Parser {
 
         // Vaciar operadores restantes de la pila
         while (!operatorStack.isEmpty()) {
-            String generatedQuadForSimLocal = "---"; 
+            String generatedQuadForSimLocal = "---"; // Inicializar aquí
 
             if (operatorStack.peek().type == PAREN_IZQ || operatorStack.peek().type == PAREN_DER) {
                 quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Paréntesis no balanceados al final.",
@@ -1179,7 +1177,7 @@ public class Parser {
 
         QuadrupleGenerationResult quadResult = generateQuadruples(exprTokens, finalTarget);
         data.quadruples = quadResult.quadruples;
-        data.quadrupleStackSimulation = quadResult.stackSimulation;
+        data.quadrupleStackSimulation = quadResult.stackSimulation; // Asegúrate de asignar la simulación de pila
         data.numericResultsSimulation = quadResult.numericResults; 
 
         collectedExpressions.add(data);
