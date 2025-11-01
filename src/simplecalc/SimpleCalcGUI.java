@@ -15,8 +15,8 @@ import java.util.regex.Pattern;
 import java.util.HashSet;
 import java.util.Set;
 
-
 public class SimpleCalcGUI extends JFrame {
+
     private JTextArea inputArea;
     private JTextArea outputArea;
     private JLabel statusLabel;
@@ -27,10 +27,9 @@ public class SimpleCalcGUI extends JFrame {
     private int lastUniqueTempVars;
     private long lastCompilationDurationMs;
 
-
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1200, 700); 
+        setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -52,55 +51,19 @@ public class SimpleCalcGUI extends JFrame {
         LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
         inputScrollPane.setRowHeaderView(lineNumbers);
 
-inputArea.setText("fun main() {\n" +
-                "    val valorInicial: Int = 100\n" +
-                "    val constante1: Int = 5 + 3\n" +
-                "    var constante2: Int = (20 / 4) * 2\n" +
-                "    \n" +
-                "    print(\"Constante 1: \")\n" +
-                "    print(constante1)\n" +
-                "    print(\"\\nConstante 2: \")\n" +
-                "    print(constante2)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val a: Int = valorInicial\n" +
-                "    var b: Int = a\n" +
-                "    var c: Int = b + constante1\n" +
-                "    \n" +
-                "    print(\"Valor de c: \")\n" +
-                "    print(c)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val d: Int = 10\n" +
-                "    var e: Int = d * (constante1 - 2)\n" +
-                "    \n" +
-                "    print(\"Valor de e: \")\n" +
-                "    print(e)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    var f: Int = e\n" +
-                "    val g: Int = f / 2 + constante2\n" +
-                "    \n" +
-                "    print(\"Valor de g: \")\n" +
-                "    print(g)\n" +
-                "    print(\"\\n\")\n" +
-                "    \n" +
-                "    val h: Int = a\n" +
-                "    var i: Int = h + b\n" +
-                "    \n" +
-                "    print(\"Valor de i: \")\n" +
-                "    print(i)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val k: Int = 7\n" +
-                "    var l: Int = k * (a + 3) - (b / c)\n" +
-                "    \n" +
-                "    print(\"Valor de l: \")\n" +
-                "    print(l)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n" +
-                "}");
+        inputArea.setText("fun main() {\n"
+                + " val a: Int = 10\n"
+                + "val b: Int = a\n"
+                + // b es una copia de a
+                "var c: Int = b + 5\n"
+                + // Si b se propaga, esto sería: c = a + 5 (menos un cuádruplo de copia)
+                "val x: Int = a\n"
+                + "val y: Int = x\n"
+                + "val z: Int = y * 2\n"
+                + // Si y se propaga a x, y x a a, sería: z = a * 2
+                "\n"
+                + "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n"
+                + "}");
 
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -139,12 +102,12 @@ inputArea.setText("fun main() {\n" +
                 processSemanticAnalysis();
             }
         });
-        
+
         JButton generateIntermediateButton = new JButton("Generar Intermedio");
         generateIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                generateIntermediateCode(); 
+                generateIntermediateCode();
             }
         });
 
@@ -156,7 +119,6 @@ inputArea.setText("fun main() {\n" +
                 displayMetrics(); // Nuevo método para mostrar métricas
             }
         });
-
 
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
@@ -173,7 +135,7 @@ inputArea.setText("fun main() {\n" +
                 clearEditorAndOutput();
             }
         });
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
@@ -212,17 +174,17 @@ inputArea.setText("fun main() {\n" +
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
-        List<String> allParserErrors = parser.getErrors(); 
+        parser.parse();
+        List<String> allParserErrors = parser.getErrors();
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -265,7 +227,7 @@ inputArea.setText("fun main() {\n" +
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Tokens Reconocidos ---\n");
         sb.append(Token.getTableHeader()).append("\n");
@@ -277,10 +239,10 @@ inputArea.setText("fun main() {\n" +
         sb.append(Token.getTableFooter()).append("\n\n");
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -312,20 +274,20 @@ inputArea.setText("fun main() {\n" +
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
-                                              .filter(err -> !err.contains("Error semántico")) 
-                                              .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -335,7 +297,7 @@ inputArea.setText("fun main() {\n" +
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -370,23 +332,23 @@ inputArea.setText("fun main() {\n" +
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
-        List<String> allParserErrors = parser.getErrors(); 
+        List<String> allParserErrors = parser.getErrors();
         List<String> semanticErrors = allParserErrors.stream()
-                                               .filter(err -> err.contains("Error semántico"))
-                                               .collect(Collectors.toList());
+                .filter(err -> err.contains("Error semántico"))
+                .collect(Collectors.toList());
         List<String> syntaxErrors = allParserErrors.stream()
-                                                .filter(err -> !err.contains("Error semántico"))
-                                                .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -396,7 +358,7 @@ inputArea.setText("fun main() {\n" +
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -428,7 +390,7 @@ inputArea.setText("fun main() {\n" +
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
     }
-    
+
     // --- MODIFICADO: generateIntermediateCode para almacenar métricas ---
     private void generateIntermediateCode() {
         outputArea.setText("");
@@ -439,13 +401,13 @@ inputArea.setText("fun main() {\n" +
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         // --- Inicia medición de tiempo ---
         long startTime = System.nanoTime();
@@ -480,8 +442,8 @@ inputArea.setText("fun main() {\n" +
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
             int currentTotalQuadruples = 0;
-            Set<String> currentUniqueTempVars = new HashSet<>(); 
-            
+            Set<String> currentUniqueTempVars = new HashSet<>();
+
             if (expressions.isEmpty()) {
                 sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
@@ -490,7 +452,7 @@ inputArea.setText("fun main() {\n" +
                     sb.append("Expresión #").append(i + 1).append(" ");
                     sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
-                    
+
                     currentTotalQuadruples += data.quadruples.size();
                     // Contar temporales únicas
                     Pattern p = Pattern.compile("t\\d+");
@@ -502,7 +464,7 @@ inputArea.setText("fun main() {\n" +
                     }
                 }
             }
-            
+
             // Almacenar métricas para el botón "Mostrar Métricas"
             lastTotalQuadruples = currentTotalQuadruples;
             lastUniqueTempVars = currentUniqueTempVars.size();
@@ -520,7 +482,7 @@ inputArea.setText("fun main() {\n" +
     private void displayMetrics() {
         outputArea.setText(""); // Limpiar la salida anterior
         inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
         sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
@@ -534,7 +496,6 @@ inputArea.setText("fun main() {\n" +
         statusLabel.setForeground(Color.BLUE); // Un color distinto para métricas
     }
 
-
     private void highlightErrorFromMessage(String errorMessage) {
         try {
             if (errorMessage.startsWith("[")) {
@@ -542,10 +503,10 @@ inputArea.setText("fun main() {\n" +
                 String[] parts = locationPart.split(",");
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                
+
                 String lexemeToHighlight = "";
                 int lexemeLength = 1;
-                
+
                 int startLexicalError = errorMessage.indexOf("Error Léxico: '");
                 if (startLexicalError != -1) {
                     startLexicalError += "Error Léxico: '".length();
@@ -557,17 +518,17 @@ inputArea.setText("fun main() {\n" +
                         return;
                     }
                 }
-                
+
                 int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
                 if (startSyntaxSemanticError != -1) {
-                     startSyntaxSemanticError += "Error en '".length();
-                     int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
-                     if (endSyntaxSemanticError != -1) {
-                         lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
-                         lexemeLength = lexemeToHighlight.length();
-                         highlightError(line, col, lexemeLength);
-                         return;
-                     }
+                    startSyntaxSemanticError += "Error en '".length();
+                    int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
+                    if (endSyntaxSemanticError != -1) {
+                        lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
+                        lexemeLength = lexemeToHighlight.length();
+                        highlightError(line, col, lexemeLength);
+                        return;
+                    }
                 }
                 int startSemanticErrorNear = errorMessage.indexOf("Error semántico cerca de '");
                 if (startSemanticErrorNear != -1) {
@@ -580,7 +541,7 @@ inputArea.setText("fun main() {\n" +
                         return;
                     }
                 }
-                
+
                 highlightError(line, col, 1);
 
             }
@@ -600,16 +561,16 @@ inputArea.setText("fun main() {\n" +
 
             int startOffset = inputArea.getLineStartOffset(docLine) + docCol;
             int endOffset = startOffset + length;
-            
-            if (startOffset < inputArea.getDocument().getLength()) {
-                 endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
-                 endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
 
-                 if(startOffset < endOffset){
-                     inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
-                 } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()){
-                     inputArea.getHighlighter().addHighlight(startOffset, startOffset +1, errorPainter);
-                 }
+            if (startOffset < inputArea.getDocument().getLength()) {
+                endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
+                endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
+
+                if (startOffset < endOffset) {
+                    inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
+                } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()) {
+                    inputArea.getHighlighter().addHighlight(startOffset, startOffset + 1, errorPainter);
+                }
             }
 
         } catch (BadLocationException ex) {
