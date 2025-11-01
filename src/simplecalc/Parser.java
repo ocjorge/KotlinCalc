@@ -6,9 +6,9 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Stack; 
+import java.util.Stack;
 import static simplecalc.Token.TokenType.*;
-import java.util.stream.Collectors; 
+import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,46 +18,51 @@ public class Parser {
     private int current = 0;
     private List<String> errors = new ArrayList<>();
     private Set<String> declaredVariables = new HashSet<>();
-    private Map<String, String> variableTypes = new HashMap<>(); 
-    private Map<String, Integer> variableValues = new HashMap<>(); 
+    private Map<String, String> variableTypes = new HashMap<>();
+    private Map<String, Integer> variableValues = new HashMap<>(); // Valores numéricos persistentes de las variables
 
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
-    
+
+    // **Optimización: Precompilación del patrón regex para la propagación de copias.**
+    // Este patrón se usa repetidamente en getPropagatedValue para identificar asignaciones.
+    private static final Pattern QUAD_ASSIGNMENT_PATTERN = Pattern.compile("(t\\d+) = (.+)");
+
+
     // Clase auxiliar para almacenar los datos de cada expresión
-    public static class ExpressionData { 
+    public static class ExpressionData {
         List<Token> infixTokens;
         String prefixExpression;
-        List<String> prefixStackSimulation; 
-        List<String> quadruples; 
-        List<String> quadrupleStackSimulation; 
-        Map<String, Integer> numericResultsSimulation; 
-        int lineNumber; 
+        List<String> prefixStackSimulation;
+        List<String> quadruples;
+        List<String> quadrupleStackSimulation;
+        Map<String, Integer> numericResultsSimulation;
+        int lineNumber;
 
-        public ExpressionData(List<Token> infixTokens, int lineNumber) { 
-            this.infixTokens = new ArrayList<>(infixTokens); 
+        public ExpressionData(List<Token> infixTokens, int lineNumber) {
+            this.infixTokens = new ArrayList<>(infixTokens);
             this.prefixExpression = "";
-            this.prefixStackSimulation = new ArrayList<>(); 
+            this.prefixStackSimulation = new ArrayList<>();
             this.quadruples = new ArrayList<>();
             this.quadrupleStackSimulation = new ArrayList<>();
-            this.numericResultsSimulation = new HashMap<>(); 
-            this.lineNumber = lineNumber; 
+            this.numericResultsSimulation = new HashMap<>();
+            this.lineNumber = lineNumber;
         }
 
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append("  Línea ").append(lineNumber).append(": Original (Infija): ").append(Parser.tokensToString(infixTokens)).append("\n"); 
+            sb.append("  Línea ").append(lineNumber).append(": Original (Infija): ").append(Parser.tokensToString(infixTokens)).append("\n");
             sb.append("  Simulación Pila (Infija a Prefija):\n");
-            if (prefixStackSimulation.isEmpty() || prefixStackSimulation.size() <= 1) { 
+            if (prefixStackSimulation.isEmpty() || prefixStackSimulation.size() <= 1) {
                 sb.append("    (No aplica / Trivial para esta expresión)\n");
             } else {
                 for (String step : prefixStackSimulation) {
                     sb.append("    ").append(step).append("\n");
                 }
             }
-            
-            sb.append("  Prefija: ").append(prefixExpression).append("\n"); 
-            
+
+            sb.append("  Prefija: ").append(prefixExpression).append("\n");
+
             sb.append("  Cuádruplos (Tres Direcciones):\n");
             if (quadruples.isEmpty()) {
                  sb.append("    (No aplica para esta expresión)\n");
@@ -66,16 +71,16 @@ public class Parser {
                     sb.append("    ").append(quad).append("\n");
                 }
             }
-            
-            sb.append("  Simulación Pila (Generación Cuádruplos desde Infija):\n"); 
-            if (quadrupleStackSimulation.isEmpty() || quadrupleStackSimulation.size() <= 1) { 
+
+            sb.append("  Simulación Pila (Generación Cuádruplos desde Infija):\n");
+            if (quadrupleStackSimulation.isEmpty() || quadrupleStackSimulation.size() <= 1) {
                 sb.append("    (No aplica / Trivial para esta expresión)\n");
             } else {
                 for (String step : quadrupleStackSimulation) {
                     sb.append("    ").append(step).append("\n");
                 }
             }
-            
+
             if (!numericResultsSimulation.isEmpty()) {
                 sb.append("  Resultados Numéricos (Simulación):\n");
                 numericResultsSimulation.forEach((var, val) -> sb.append(String.format("    %s = %d\n", var, val)));
@@ -101,10 +106,10 @@ public class Parser {
         current = 0;
         errors.clear();
         declaredVariables.clear();
-        variableTypes.clear(); 
-        variableValues.clear(); 
-        collectedExpressions.clear(); 
-        
+        variableTypes.clear();
+        variableValues.clear();
+        collectedExpressions.clear();
+
         try {
             programa();
         } catch (SyntaxError e) {
@@ -112,7 +117,7 @@ public class Parser {
         }
         return errors.isEmpty();
     }
-    
+
     public List<Token> getTokens() {
         return tokens;
     }
@@ -175,8 +180,8 @@ public class Parser {
         } else if (check(READLINE_KEYWORD)) {
             error(peek(), "Sentencia inválida: 'readLine()' debe ser asignado a una variable.",
                         "La función 'readLine()' debe utilizarse como parte de una asignación (ej. 'val x = readLine()').");
-            advance(); 
-            if (check(PAREN_IZQ)) { 
+            advance();
+            if (check(PAREN_IZQ)) {
                 advance();
                 if (check(PAREN_DER)) {
                     advance();
@@ -205,16 +210,16 @@ public class Parser {
     }
 
     private void declaracion_stmt() {
-        Token declarationType = advance(); 
+        Token declarationType = advance();
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
-        
+
         if (declaredVariables.contains(varNameToken.lexeme)) {
              addSemanticError(varNameToken, "Redeclaración de variable.",
                            "La variable '" + varNameToken.lexeme + "' ya ha sido declarada.");
         }
 
         consume(DOS_PUNTOS, "Se esperaba ':' después del nombre de variable '" + varNameToken.lexeme + "'.");
-        
+
         Token typeToken = consume(ID, "Se esperaba un tipo (ej. 'Int', 'String') después de ':'.");
         if (!isValidType(typeToken.lexeme)) {
             addSemanticError(typeToken, "Tipo de dato no reconocido: '" + typeToken.lexeme + "'.",
@@ -222,12 +227,12 @@ public class Parser {
         }
 
         consume(ASIGNACION, "Se esperaba '=' después del tipo '" + typeToken.lexeme + "'.");
-        
+
         // --- Expresión de asignación ---
-        int exprStart = current; 
+        int exprStart = current;
         String declaredType = typeToken.lexeme;
-        String assignedExpressionType = expresion_aritmetica(); 
-        int exprEnd = current; 
+        String assignedExpressionType = expresion_aritmetica();
+        int exprEnd = current;
 
         checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
 
@@ -239,9 +244,9 @@ public class Parser {
         // Y SOLO si el tipo final es Int
         if (!assignedExpressionType.equals("Unknown") && !assignedExpressionType.equals("ErrorType") && assignedExpressionType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
                 int lineNumber = subExprTokens.isEmpty() ? varNameToken.line : subExprTokens.get(0).line;
-                collectExpression(subExprTokens, varNameToken.lexeme, lineNumber); 
+                collectExpression(subExprTokens, varNameToken.lexeme, lineNumber);
             }
         }
 
@@ -253,17 +258,17 @@ public class Parser {
         checkVariableInitialized(varNameToken);
 
         String declaredType = variableTypes.get(varNameToken.lexeme);
-        if (declaredType == null) { 
+        if (declaredType == null) {
              addSemanticError(varNameToken, "Error interno: Tipo de variable no encontrado.",
                            "La variable '" + varNameToken.lexeme + "' no tiene un tipo asignado.");
              declaredType = "Unknown";
         }
 
         consume(ASIGNACION, "Se esperaba '=' después del nombre de variable '" + varNameToken.lexeme + "'.");
-        
+
         // --- Expresión de asignación ---
         int exprStart = current;
-        String assignedExpressionType = expresion_aritmetica(); 
+        String assignedExpressionType = expresion_aritmetica();
         int exprEnd = current;
 
         checkTypeCompatibility(declaredType, assignedExpressionType, varNameToken);
@@ -276,7 +281,7 @@ public class Parser {
             List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
             if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
                 int lineNumber = subExprTokens.isEmpty() ? varNameToken.line : subExprTokens.get(0).line;
-                collectExpression(subExprTokens, varNameToken.lexeme, lineNumber); 
+                collectExpression(subExprTokens, varNameToken.lexeme, lineNumber);
             }
         }
 
@@ -293,32 +298,32 @@ public class Parser {
     private void salida_stmt() {
         consume(PRINT_KEYWORD, "Se esperaba 'print' al inicio de la sentencia de salida.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'print'.");
-        
+
         // --- Expresión de print ---
         int exprStart = current;
-        String exprType = expresion_aritmetica(); 
+        String exprType = expresion_aritmetica();
         int exprEnd = current;
-        
+
         // Recolectamos la expresión si es aritmética y válida.
         // Solo si el tipo es Int o una cadena literal simple (para PRINT).
         if (!exprType.equals("Unknown") && !exprType.equals("ErrorType") && (exprType.equals("Int") || (exprType.equals("String") && tokens.subList(exprStart, exprEnd).size() == 1 && tokens.subList(exprStart, exprEnd).get(0).type == CADENA_LITERAL))) {
             List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens) || (subExprTokens.size() == 1 && subExprTokens.get(0).type == CADENA_LITERAL)) { 
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens) || (subExprTokens.size() == 1 && subExprTokens.get(0).type == CADENA_LITERAL)) {
                 int lineNumber = subExprTokens.get(0).line;
-                collectExpression(subExprTokens, "print_target", lineNumber); 
+                collectExpression(subExprTokens, "print_target", lineNumber);
             }
         }
-        
-        consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'."); 
+
+        consume(PAREN_DER, "Se esperaba ')' para cerrar 'print'.");
         consumeOptionalEOLs();
     }
 
     private void if_stmt() {
         consume(IF_KEYWORD, "Error interno: Se esperaba 'if' para if_stmt.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'if'.");
-        
+
         condicion_simple(); // Las condiciones no generan cuádruplos aritméticos en esta fase
-        
+
         consume(PAREN_DER, "Se esperaba ')' después de la condición en 'if'.");
         bloque_if();
     }
@@ -350,7 +355,7 @@ public class Parser {
     private void while_stmt() {
         consume(WHILE_KEYWORD, "Se esperaba 'while'.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'while'.");
-        
+
         condicion_simple(); // Las condiciones no generan cuádruplos aritméticos
 
         consume(PAREN_DER, "Se esperaba ')' después de la condición en 'while'.");
@@ -360,44 +365,44 @@ public class Parser {
     private void for_stmt() {
         consume(FOR_KEYWORD, "Se esperaba 'for'.");
         consume(PAREN_IZQ, "Se esperaba '(' después de 'for'.");
-        
+
         Token loopVarName = consume(ID, "Se esperaba un nombre de variable para el bucle 'for'.");
         if (declaredVariables.contains(loopVarName.lexeme)) {
              addSemanticError(loopVarName, "Redeclaración de variable.",
                            "La variable '" + loopVarName.lexeme + "' ya ha sido declarada.");
         }
-        declaredVariables.add(loopVarName.lexeme); 
-        variableTypes.put(loopVarName.lexeme, "Int"); 
+        declaredVariables.add(loopVarName.lexeme);
+        variableTypes.put(loopVarName.lexeme, "Int");
         System.out.println("DEBUG for_stmt: Declarando variable de bucle: " + loopVarName.lexeme + " de tipo: Int");
 
 
         consume(IN_KEYWORD, "Se esperaba 'in' después del nombre de la variable en 'for'.");
-        
+
         // --- Expresión de inicio del rango ---
         int rangeStartExprStart = current;
-        String rangeStartType = expresion_aritmetica(); 
+        String rangeStartType = expresion_aritmetica();
         int rangeStartExprEnd = current;
         checkTypeCompatibility("Int", rangeStartType, previous());
         if (!rangeStartType.equals("Unknown") && !rangeStartType.equals("ErrorType") && rangeStartType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeStartExprStart, rangeStartExprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
                 int lineNumber = subExprTokens.get(0).line;
-                collectExpression(subExprTokens, "range_start", lineNumber); 
+                collectExpression(subExprTokens, "range_start", lineNumber);
             }
         }
-        
+
         consume(DOT_DOT, "Se esperaba '..' para definir el rango en el bucle 'for'.");
-        
+
         // --- Expresión de fin del rango ---
         int rangeEndExprStart = current;
-        String rangeEndType = expresion_aritmetica(); 
+        String rangeEndType = expresion_aritmetica();
         int rangeEndExprEnd = current;
         checkTypeCompatibility("Int", rangeEndType, previous());
         if (!rangeEndType.equals("Unknown") && !rangeEndType.equals("ErrorType") && rangeEndType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeEndExprStart, rangeEndExprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) { 
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
                 int lineNumber = subExprTokens.get(0).line;
-                collectExpression(subExprTokens, "range_end", lineNumber); 
+                collectExpression(subExprTokens, "range_end", lineNumber);
             }
         }
 
@@ -431,27 +436,27 @@ public class Parser {
 
 
     private void condicion_simple() {
-        String leftOperandType = expresion_aritmetica(); 
-        
-        Token operatorToken = peek(); 
-        operador_relacional(); 
+        String leftOperandType = expresion_aritmetica();
 
-        String rightOperandType = expresion_aritmetica(); 
+        Token operatorToken = peek();
+        operador_relacional();
+
+        String rightOperandType = expresion_aritmetica();
 
         if (!leftOperandType.equals("Unknown") && !rightOperandType.equals("Unknown") &&
             !leftOperandType.equals("ErrorType") && !rightOperandType.equals("ErrorType")) {
-            
+
             if (!leftOperandType.equals(rightOperandType)) {
                 addSemanticError(operatorToken, "Incompatibilidad de tipos en la condición.",
                               "No se puede comparar un tipo '" + leftOperandType + "' con un tipo '" + rightOperandType + "'.");
             }
-            if (!leftOperandType.equals("Int") && !leftOperandType.equals("String")) { 
+            if (!leftOperandType.equals("Int") && !leftOperandType.equals("String")) {
                  addSemanticError(operatorToken, "Tipo de dato no comparable.",
                                "Las comparaciones solo están permitidas para tipos 'Int' o 'String'. Tipo encontrado: '" + leftOperandType + "'.");
             }
         }
     }
-    
+
     private void operador_relacional() {
         if (check(OP_MENOR) || check(OP_MAYOR) || check(OP_IGUAL_IGUAL)) {
             advance();
@@ -465,22 +470,22 @@ public class Parser {
         while (match(EOL)) {
         }
     }
-    
+
     private String expresion_aritmetica() {
         String type = termino();
         while (match(OP_SUMA, OP_RESTA)) {
-            Token operator = previous(); 
-            
+            Token operator = previous();
+
             String rightType = termino();
 
             if (type.equals("Unknown") || rightType.equals("Unknown")) {
                 type = "Unknown";
             } else if (type.equals("ErrorType") || rightType.equals("ErrorType")) {
-                type = "ErrorType"; 
+                type = "ErrorType";
             } else if (type.equals("Int") && rightType.equals("Int")) {
                 type = "Int";
             } else if (type.equals("String") && rightType.equals("String") && operator.type == OP_SUMA) {
-                type = "String"; 
+                type = "String";
             } else {
                 addSemanticError(operator, "Incompatibilidad de tipos en operación.",
                               "Operación '" + operator.lexeme + "' entre '" + type + "' y '" + rightType + "' no permitida.");
@@ -493,7 +498,7 @@ public class Parser {
     private String termino() {
         String type = factor();
         while (match(OP_MULT, OP_DIV)) {
-            Token operator = previous(); 
+            Token operator = previous();
             String rightType = factor();
 
             if (type.equals("Unknown") || rightType.equals("Unknown")) {
@@ -517,7 +522,7 @@ public class Parser {
             error(peek(), "Expresión aritmética malformada.",
                     "Cadena literal o secuencia inválida: " + lexerErrorMessage);
             advance();
-            return "Unknown"; 
+            return "Unknown";
         }
 
         String type = "Unknown";
@@ -526,10 +531,10 @@ public class Parser {
             if (!declaredVariables.contains(idToken.lexeme)) {
                 addSemanticError(idToken, "Variable no inicializada: " + idToken.lexeme,
                                 "La variable '" + idToken.lexeme + "' se usa antes de declararla.");
-                type = "Unknown"; 
+                type = "Unknown";
             } else {
-                type = variableTypes.get(idToken.lexeme); 
-                if (type == null) type = "Unknown"; 
+                type = variableTypes.get(idToken.lexeme);
+                if (type == null) type = "Unknown";
             }
             consume(ID, "");
         } else if (check(NUMERO_ENTERO)) {
@@ -539,13 +544,13 @@ public class Parser {
             type = "String";
             consume(CADENA_LITERAL, "");
         } else if (check(READLINE_KEYWORD)) {
-            type = "String"; 
+            type = "String";
             consume(READLINE_KEYWORD, "");
             consume(PAREN_IZQ, "Se esperaba '(' después de 'readLine'.");
             consume(PAREN_DER, "Se esperaba ')' después de '('.");
         } else if (check(PAREN_IZQ)) {
             consume(PAREN_IZQ, "");
-            type = expresion_aritmetica(); 
+            type = expresion_aritmetica();
             consume(PAREN_DER, "Se esperaba ')' para cerrar la expresión entre paréntesis.");
         } else {
             error(peek(), "Expresión aritmética malformada.",
@@ -566,15 +571,15 @@ public class Parser {
             }
             throw error(peek(), message, message);
         }
-        
+
         if (peek().type == EOL && type != EOL && type != EOF) {
             throw error(peek(), message, message);
         }
-        
+
         if (check(type)) {
             return advance();
         }
-        
+
         throw error(peek(), message, message);
     }
 
@@ -596,7 +601,7 @@ public class Parser {
                     "La variable '" + name.lexeme + "' se usa antes de declararla.");
         }
     }
-    
+
     private boolean match(Token.TokenType... types) {
         for (Token.TokenType type : types) {
             if (check(type)) {
@@ -643,16 +648,16 @@ public class Parser {
         }
         return tokens.get(current - 1);
     }
-    
+
     private boolean isValidType(String typeName) {
         return typeName.equals("Int") || typeName.equals("String");
     }
 
     private void checkTypeCompatibility(String expectedType, String actualType, Token problemToken) {
         if (expectedType.equals("Unknown") || actualType.equals("Unknown") || actualType.equals("ErrorType")) {
-            return; 
+            return;
         }
-        
+
         if (!expectedType.equals(actualType)) {
             addSemanticError(problemToken, "Incompatibilidad de tipos en asignación.",
                                 "Se esperaba un valor de tipo '" + expectedType + "' pero se encontró un tipo '" + actualType + "'.");
@@ -710,25 +715,25 @@ public class Parser {
             case OP_MULT:
             case OP_DIV:
                 return 2;
-            case PAREN_IZQ: 
-                return 0; 
+            case PAREN_IZQ:
+                return 0;
             default:
-                return 0; 
+                return 0;
         }
     }
-    
+
     // Solo operadores aritméticos
-    private boolean isArithmeticOperator(Token.TokenType type) { 
+    private boolean isArithmeticOperator(Token.TokenType type) {
         return type == OP_SUMA || type == OP_RESTA || type == OP_MULT || type == OP_DIV;
     }
 
     // Determina si una lista de tokens de expresión contiene operadores ARITMÉTICOS
-    private boolean hasArithmeticOperators(List<Token> tokens) { 
-        if (tokens.size() <= 1) { 
+    private boolean hasArithmeticOperators(List<Token> tokens) {
+        if (tokens.size() <= 1) {
             return false;
         }
         for (Token t : tokens) {
-            if (isArithmeticOperator(t.type)) { 
+            if (isArithmeticOperator(t.type)) {
                 return true;
             }
         }
@@ -736,16 +741,16 @@ public class Parser {
     }
 
     // Método para verificar si es un solo operando de tipo ARITMÉTICO
-    private boolean isSingleArithmeticOperand(List<Token> tokens) { 
+    private boolean isSingleArithmeticOperand(List<Token> tokens) {
         if (tokens.size() == 1) {
             Token t = tokens.get(0);
-            return (t.type == ID || t.type == NUMERO_ENTERO); 
+            return (t.type == ID || t.type == NUMERO_ENTERO);
         }
         return false;
     }
 
 
-    private static String tokensToString(List<Token> tokens) { 
+    private static String tokensToString(List<Token> tokens) {
         StringBuilder sb = new StringBuilder();
         for (Token t : tokens) {
             sb.append(t.lexeme).append(" ");
@@ -755,7 +760,7 @@ public class Parser {
 
 
     // Clase para el resultado de la conversión a PREFIJA (directamente)
-    private static class ExpressionConversionResult { 
+    private static class ExpressionConversionResult {
         List<Token> prefixTokens; // PREFIJA
         List<String> stackSimulation; // Simulación de pila para Infija -> Prefija
 
@@ -851,8 +856,14 @@ public class Parser {
         }
     }
 
-    // NUEVO ALGORITMO: Generar cuádruplos directamente desde Infija (algoritmo de doble pila)
-    // También realiza una simulación de cálculo numérico
+    /**
+     * Genera cuádruplos directamente desde una expresión infija, aplicando Constant Folding
+     * y Propagación de Copias. También simula los resultados numéricos.
+     *
+     * @param infixTokens La lista de tokens de la expresión infija.
+     * @param finalTarget El nombre de la variable o propósito (ej. "print_target") donde se almacenará el resultado final.
+     * @return Un objeto QuadrupleGenerationResult con los cuádruplos generados, la simulación de pila y los resultados numéricos.
+     */
     private QuadrupleGenerationResult generateQuadruples(List<Token> infixTokens, String finalTarget) {
         List<String> quadruples = new ArrayList<>();
         Stack<String> operandStack = new Stack<>(); // Guarda operandos (literales, IDs, temporales)
@@ -869,45 +880,48 @@ public class Parser {
             String valStackState = operandStack.isEmpty() ? "[]" : operandStack.toString();
             String generatedQuadForSim = "---"; // Inicializado para cada iteración del bucle for
 
-            if (token.type == ID || token.type == NUMERO_ENTERO) { // Solo operandos aritméticos (ID, NUMERO)
+            if (token.type == ID || token.type == NUMERO_ENTERO) { // Si es un operando (ID o número entero)
                 operandStack.push(token.lexeme);
                 generatedQuadForSim = "Operando a pila: " + token.lexeme;
-            } else if (token.type == PAREN_IZQ) {
+            } else if (token.type == PAREN_IZQ) { // Si es paréntesis izquierdo, se empuja a la pila de operadores
                 operatorStack.push(token);
                 generatedQuadForSim = "Push PAREN_IZQ";
-            } else if (token.type == PAREN_DER) {
+            } else if (token.type == PAREN_DER) { // Si es paréntesis derecho, se procesan operadores hasta encontrar el paréntesis izquierdo
                 while (!operatorStack.isEmpty() && operatorStack.peek().type != PAREN_IZQ) {
-                    if (operandStack.size() < 2) {
+                    if (operandStack.size() < 2) { // Verificar suficientes operandos
                         quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Pila insuficiente para operador.", valStackState, opStackState, token.lexeme));
                         return new QuadrupleGenerationResult(new ArrayList<>(), quadrupleStackSimulationSteps, new HashMap<>());
                     }
-                    String arg2 = operandStack.pop();
-                    String arg1 = operandStack.pop();
-                    Token op = operatorStack.pop(); // Capturar el operador antes de usarlo en format
-                    String tempVar = "t" + (++tempVarCounter);
+                    String arg2 = operandStack.pop(); // Sacar el segundo operando
+                    String arg1 = operandStack.pop(); // Sacar el primer operando
+                    Token op = operatorStack.pop();    // Sacar el operador
+                    String tempVar = "t" + (++tempVarCounter); // Generar una variable temporal
 
-                    // --- OPTIMIZACIÓN: CONSTANT FOLDING ---
-                    // y manejo de COPY PROPAGATION para los argumentos
-                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues); 
-                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues); 
-                    
-                    if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) { 
+                    // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
+                    // Antes de generar el cuádruplo, intentamos obtener el valor más "constante" de cada argumento.
+                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
+                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
+
+                    if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
+                        // Si ambos argumentos (después de la propagación) son literales numéricos,
+                        // podemos aplicar Constant Folding: la operación se realiza en tiempo de compilación.
                         int val1 = Integer.parseInt(effectiveArg1);
                         int val2 = Integer.parseInt(effectiveArg2);
-                        int result = evaluate(val1, val2, op.type);
-                        currentNumericValues.put(tempVar, result);
-                        String foldedQuad = String.format("%s = %d", tempVar, result); 
+                        int result = evaluate(val1, val2, op.type); // Realizar la operación
+                        currentNumericValues.put(tempVar, result); // Almacenar el resultado plegado para futuras propagaciones
+                        String foldedQuad = String.format("%s = %d", tempVar, result); // Generar un cuádruplo simple
                         quadruples.add(foldedQuad);
-                        operandStack.push(tempVar);
-                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]"; 
+                        operandStack.push(tempVar); // Empujar la temporal con el valor plegado
+                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]"; // Mensaje para simulación
                     } else {
-                        // Simular cálculo numérico normal
-                        int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues); 
-                        int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues); 
+                        // Si no se puede aplicar Constant Folding, se genera el cuádruplo normal.
+                        // Aún así, simulamos el cálculo numérico para la trazabilidad y los resultados.
+                        int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues);
+                        int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues);
                         int result = evaluate(val1, val2, op.type);
-                        currentNumericValues.put(tempVar, result); 
-                        
-                        String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2); 
+                        currentNumericValues.put(tempVar, result); // Almacenar el resultado de la simulación
+
+                        String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
                         quadruples.add(quad);
                         operandStack.push(tempVar);
                         generatedQuadForSim = quad + " (Resultado: " + result + ")";
@@ -919,7 +933,8 @@ public class Parser {
                     quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Paréntesis no balanceados.", valStackState, opStackState, token.lexeme));
                     return new QuadrupleGenerationResult(new ArrayList<>(), quadrupleStackSimulationSteps, new HashMap<>());
                 }
-            } else if (isArithmeticOperator(token.type)) {
+            } else if (isArithmeticOperator(token.type)) { // Si es un operador aritmético
+                // Procesar operadores en la pila con mayor o igual precedencia
                 while (!operatorStack.isEmpty() && operatorStack.peek().type != PAREN_IZQ
                         && getOperatorPrecedence(operatorStack.peek().type) >= getOperatorPrecedence(token.type)) {
                     if (operandStack.size() < 2) {
@@ -928,47 +943,45 @@ public class Parser {
                     }
                     String arg2 = operandStack.pop();
                     String arg1 = operandStack.pop();
-                    Token op = operatorStack.pop(); // Capturar el operador
+                    Token op = operatorStack.pop();
                     String tempVar = "t" + (++tempVarCounter);
 
-                    // --- OPTIMIZACIÓN: CONSTANT FOLDING ---
-                    // y manejo de COPY PROPAGATION para los argumentos
-                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues); 
-                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues); 
+                    // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
+                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
+                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
 
                     if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
                         int val1 = Integer.parseInt(effectiveArg1);
                         int val2 = Integer.parseInt(effectiveArg2);
                         int result = evaluate(val1, val2, op.type);
                         currentNumericValues.put(tempVar, result);
-                        String foldedQuad = String.format("%s = %d", tempVar, result); 
+                        String foldedQuad = String.format("%s = %d", tempVar, result);
                         quadruples.add(foldedQuad);
                         operandStack.push(tempVar);
-                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]"; 
+                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]";
                     } else {
-                        // Simular cálculo numérico normal
-                        int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues); 
-                        int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues); 
+                        int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues);
+                        int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues);
                         int result = evaluate(val1, val2, op.type);
-                        currentNumericValues.put(tempVar, result); 
+                        currentNumericValues.put(tempVar, result);
 
-                        String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2); 
+                        String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
                         quadruples.add(quad);
                         operandStack.push(tempVar);
                         generatedQuadForSim = quad + " (Resultado: " + result + ")";
                     }
                 }
-                operatorStack.push(token);
+                operatorStack.push(token); // Empujar el operador actual
             }
             quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | %s",
                     operandStack.isEmpty() ? "[]" : operandStack.toString(),
                     operatorStack.isEmpty() ? "[]" : operatorStack.toString(),
-                    token.lexeme, generatedQuadForSim)); 
+                    token.lexeme, generatedQuadForSim));
         }
 
-        // Vaciar operadores restantes de la pila
+        // Vaciar operadores restantes de la pila al final de la expresión
         while (!operatorStack.isEmpty()) {
-            String generatedQuadForSimLocal = "---"; // Inicializar aquí
+            String generatedQuadForSimLocal = "---";
 
             if (operatorStack.peek().type == PAREN_IZQ || operatorStack.peek().type == PAREN_DER) {
                 quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Paréntesis no balanceados al final.",
@@ -985,31 +998,29 @@ public class Parser {
             }
             String arg2 = operandStack.pop();
             String arg1 = operandStack.pop();
-            Token op = operatorStack.pop(); // Capturar el operador
+            Token op = operatorStack.pop();
             String tempVar = "t" + (++tempVarCounter);
 
-            // --- OPTIMIZACIÓN: CONSTANT FOLDING ---
-            // y manejo de COPY PROPAGATION para los argumentos
-            String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues); 
-            String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues); 
+            // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
+            String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
+            String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
 
             if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
                 int val1 = Integer.parseInt(effectiveArg1);
                 int val2 = Integer.parseInt(effectiveArg2);
                 int result = evaluate(val1, val2, op.type);
                 currentNumericValues.put(tempVar, result);
-                String foldedQuad = String.format("%s = %d", tempVar, result); 
+                String foldedQuad = String.format("%s = %d", tempVar, result);
                 quadruples.add(foldedQuad);
                 operandStack.push(tempVar);
-                generatedQuadForSimLocal = foldedQuad + " (Resultado: " + result + ") [Constant Folded]"; 
+                generatedQuadForSimLocal = foldedQuad + " (Resultado: " + result + ") [Constant Folded]";
             } else {
-                // Simular cálculo numérico normal
-                int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues); 
-                int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues); 
+                int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues);
+                int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues);
                 int result = evaluate(val1, val2, op.type);
-                currentNumericValues.put(tempVar, result); 
+                currentNumericValues.put(tempVar, result);
 
-                String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2); 
+                String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
                 quadruples.add(quad);
                 operandStack.push(tempVar);
                 generatedQuadForSimLocal = quad + " (Resultado: " + result + ")";
@@ -1018,35 +1029,40 @@ public class Parser {
             quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | %s",
                     operandStack.isEmpty() ? "[]" : operandStack.toString(),
                     operatorStack.isEmpty() ? "[]" : operatorStack.toString(),
-                    op.lexeme, generatedQuadForSimLocal)); 
+                    op.lexeme, generatedQuadForSimLocal));
         }
 
-        // Asignación final al target si es aplicable
+        // Asignación final del resultado de la expresión a su destino (variable, print, etc.)
         if (!operandStack.isEmpty()) {
             String finalExpressionResult = operandStack.pop();
-            String propagatedFinalResult = getPropagatedValue(finalExpressionResult, quadruples, currentNumericValues, variableValues); 
-            
+            // Aplicar Propagación de Copias al resultado final para obtener su forma más simple (ej. un literal numérico).
+            String propagatedFinalResult = getPropagatedValue(finalExpressionResult, quadruples, currentNumericValues, variableValues);
+
             if (finalTarget != null) {
-                int finalCalculatedValue = getNumericValueForSimulation(propagatedFinalResult, currentNumericValues); 
-                
-                if (finalTarget.equals("print_target")) { 
-                    quadruples.add(String.format("PRINT %s", propagatedFinalResult)); 
+                // Actualizar el valor numérico persistente de la variable si el target es una variable y el resultado es constante.
+                if (finalTarget.equals("print_target")) {
+                    quadruples.add(String.format("PRINT %s", propagatedFinalResult));
                 } else if (finalTarget.equals("range_start")) {
-                    quadruples.add(String.format("RANGE_START %s", propagatedFinalResult)); 
+                    quadruples.add(String.format("RANGE_START %s", propagatedFinalResult));
                 } else if (finalTarget.equals("range_end")) {
-                    quadruples.add(String.format("RANGE_END %s", propagatedFinalResult)); 
-                } else { // Es una variable a la que se asigna
-                    quadruples.add(String.format("%s = %s", finalTarget, propagatedFinalResult)); 
-                    variableValues.put(finalTarget, finalCalculatedValue); 
+                    quadruples.add(String.format("RANGE_END %s", propagatedFinalResult));
+                } else { // Es una asignación a una variable
+                    quadruples.add(String.format("%s = %s", finalTarget, propagatedFinalResult));
+                    // Si el resultado final es un literal, actualizar el valor persistente de la variable
+                    // Esto es clave para futuras propagaciones de constantes en otras expresiones.
+                    if (isNumericLiteral(propagatedFinalResult)) {
+                        variableValues.put(finalTarget, Integer.parseInt(propagatedFinalResult));
+                    } else { // Si no es un literal, se toma el valor simulado para trazabilidad.
+                        variableValues.put(finalTarget, getNumericValueForSimulation(propagatedFinalResult, currentNumericValues));
+                    }
                 }
-                quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | Asignación final: %s = %s [Optimized]", 
-                                                                "[]", "[]", "FINAL", finalTarget, propagatedFinalResult)); 
+                quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | Asignación final: %s = %s [Optimized]",
+                                                                "[]", "[]", "FINAL", finalTarget, propagatedFinalResult));
             }
         } else if (!infixTokens.isEmpty() && quadruples.isEmpty() && finalTarget != null) {
+            // Manejo de expresiones que son un solo operando (ej. `val x = 10`) y que no generaron cuádruplos intermedios.
             String operand = tokensToString(infixTokens);
-            String propagatedOperand = getPropagatedValue(operand, quadruples, currentNumericValues, variableValues); 
-
-            int finalCalculatedValue = getNumericValueForSimulation(propagatedOperand, currentNumericValues); 
+            String propagatedOperand = getPropagatedValue(operand, quadruples, currentNumericValues, variableValues);
 
             if (finalTarget.equals("print_target")) {
                  quadruples.add(String.format("PRINT %s", propagatedOperand));
@@ -1059,67 +1075,116 @@ public class Parser {
                  quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_END %s [Optimized]", propagatedOperand, propagatedOperand));
             } else { // Asignación a una variable
                  quadruples.add(String.format("%s = %s", finalTarget, propagatedOperand));
-                 variableValues.put(finalTarget, finalCalculatedValue); 
+                 if (isNumericLiteral(propagatedOperand)) {
+                    variableValues.put(finalTarget, Integer.parseInt(propagatedOperand));
+                 } else {
+                    variableValues.put(finalTarget, getNumericValueForSimulation(propagatedOperand, currentNumericValues));
+                 }
                  quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | %s = %s [Optimized]", propagatedOperand, finalTarget, propagatedOperand));
             }
         }
 
         return new QuadrupleGenerationResult(quadruples, quadrupleStackSimulationSteps, currentNumericValues);
     }
-    
+
+    /**
+     * Aplica la optimización de Propagación de Copias para obtener el valor más actualizado y directo de un operando.
+     * Esto es fundamental para el Constant Folding, ya que convierte referencias a variables o temporales
+     * a literales numéricos cuando sea posible, permitiendo que `isNumericLiteral` los detecte.
+     *
+     * Busca en:
+     * 1.  Cuádruplos ya generados en la *expresión actual* (para temporales como `t1 = t2`).
+     * 2.  Valores numéricos de temporales y variables ya calculados en la *expresión actual*.
+     * 3.  Valores persistentes de variables globales (declaradas previamente en el programa).
+     *
+     * @param operand El operando original (puede ser un ID, un literal, o una variable temporal tX).
+     * @param currentQuadruples La lista de cuádruplos generados hasta el momento para la expresión actual.
+     * @param currentNumericValues Mapa de valores numéricos de temporales y variables calculados en esta expresión.
+     * @param globalVariableValues Mapa de valores persistentes de variables globales.
+     * @return El valor propagado del operando (será un literal numérico si se logró propagar un valor constante,
+     *         o el operando original si no se encontró un valor constante propagable).
+     */
     private String getPropagatedValue(String operand, List<String> currentQuadruples, Map<String, Integer> currentNumericValues, Map<String, Integer> globalVariableValues) {
         String effectiveValue = operand;
         boolean changed;
 
-        // Propagación de copias desde los cuádruplos ya generados en esta expresión (en la misma pasada)
+        // Bucle do-while para manejar cadenas de propagación (ej. t1 = t2, t2 = t3, t3 = 5).
+        // Itera hasta que no se puedan realizar más propagaciones directas desde los cuádruplos existentes.
         do {
             changed = false;
-            // Recorrer los cuádruplos de forma inversa para encontrar la definición más reciente
-            for (int i = currentQuadruples.size() - 1; i >= 0; i--) { 
+            // Buscar propagación en los cuádruplos *actuales* generados en esta misma expresión.
+            // Esto es eficiente porque `currentQuadruples` es pequeña (solo los cuádruplos de la expresión actual).
+            for (int i = currentQuadruples.size() - 1; i >= 0; i--) { // Recorrer inversamente para encontrar la definición más reciente
                 String quad = currentQuadruples.get(i);
-                // Si el cuádruplo es una asignación simple: result = source
-                // Ej. tX = Y donde Y es un ID o un NUMERO (o una tZ que luego se propaga)
-                if (quad.matches("t\\d+ = [a-zA-Z_]\\w*") || quad.matches("t\\d+ = -?\\d+")) { 
-                    String[] parts = quad.split(" = ");
-                    String resultVar = parts[0].trim();
-                    String sourceVal = parts[1].trim();
-                    if (resultVar.equals(effectiveValue)) { 
-                        effectiveValue = sourceVal; 
-                        changed = true;
-                        break; 
+                // Usar el patrón regex precompilado
+                Matcher m = QUAD_ASSIGNMENT_PATTERN.matcher(quad);
+                if (m.find()) {
+                    String resultVar = m.group(1).trim(); // La variable temporal que recibe el valor (ej. "t1")
+                    String sourceVal = m.group(2).trim(); // El valor fuente (ej. "5", "t2", "variableX")
+
+                    // Si el operando que buscamos (`effectiveValue`) es la variable destino (`resultVar`)
+                    // y el valor fuente es diferente, propagamos el valor fuente.
+                    if (resultVar.equals(effectiveValue) && !sourceVal.equals(effectiveValue)) {
+                        effectiveValue = sourceVal;
+                        changed = true; // Se encontró una propagación, se necesita otra iteración del do-while.
+                        break; // Salir del for para re-evaluar con el nuevo effectiveValue.
                     }
                 }
             }
-        } while (changed); 
-        
-        // También propagar si el operando es una variable que ya tiene un valor numérico conocido
-        // (y no es una temporal tX, porque esas ya se manejan en currentNumericValues o se resolvieron)
-        // Y SOLO si no es ya un literal numérico
+        } while (changed); // Continuar propagando hasta que no se encuentren más cambios directos en los cuádruplos.
+
+
+        // Después de la propagación local, si el `effectiveValue` aún no es un literal numérico
+        // y es una variable declarada (no una temporal 'tX'), intentamos obtener su valor desde
+        // el mapa de valores persistentes de las variables globales (`variableValues`).
+        // Esto es crucial para `val x = 10; val y = x + 5;` -> `x` se convierte en `10`.
         if (globalVariableValues.containsKey(effectiveValue) && !effectiveValue.startsWith("t") && !isNumericLiteral(effectiveValue)) {
-            // Reemplazar la variable por su valor numérico conocido
-            return String.valueOf(globalVariableValues.get(effectiveValue));
+            Integer val = globalVariableValues.get(effectiveValue);
+            if (val != null) {
+                return String.valueOf(val); // Devolver el valor numérico como String
+            }
         }
 
+        // Si no se pudo propagar a un literal numérico, se devuelve el effectiveValue actual.
         return effectiveValue;
     }
 
 
+    /**
+     * Intenta obtener el valor numérico de un operando para propósitos de simulación y Constant Folding.
+     * Prioriza literales, luego valores calculados de temporales en la expresión actual (`currentNumericValues`),
+     * y finalmente valores persistentes de variables globales (`variableValues`).
+     *
+     * @param operand El operando como String (puede ser un literal, un ID, o una temporal tX).
+     * @param currentNumericValues Mapa de valores numéricos de temporales y variables calculados en esta expresión.
+     * @return El valor entero del operando, o 0 si no se puede determinar (como valor por defecto para simulación).
+     */
     private int getNumericValueForSimulation(String operand, Map<String, Integer> currentNumericValues) {
         try {
-            return Integer.parseInt(operand); 
+            return Integer.parseInt(operand); // Si es un literal numérico directamente
         } catch (NumberFormatException e) {
-            if (currentNumericValues.containsKey(operand)) { 
+            // Si no es un literal, buscar en los valores calculados de la expresión actual (temporales, etc.)
+            if (currentNumericValues.containsKey(operand)) {
                 Integer val = currentNumericValues.get(operand);
-                return (val != null) ? val : 0; 
+                return (val != null) ? val : 0;
             }
-            if (variableValues.containsKey(operand)) { 
+            // Si no se encontró en la expresión actual, buscar en los valores persistentes de variables globales
+            if (variableValues.containsKey(operand)) {
                 Integer val = variableValues.get(operand);
-                return (val != null) ? val : 0; 
+                return (val != null) ? val : 0;
             }
-            return 0; 
+            return 0; // Valor por defecto si no se puede determinar para simulación
         }
     }
 
+    /**
+     * Realiza la operación aritmética.
+     *
+     * @param val1 Primer operando.
+     * @param val2 Segundo operando.
+     * @param opType Tipo de operador.
+     * @return Resultado de la operación.
+     */
     private int evaluate(int val1, int val2, Token.TokenType opType) {
         switch (opType) {
             case OP_SUMA:
@@ -1130,16 +1195,22 @@ public class Parser {
                 return val1 * val2;
             case OP_DIV:
                 if (val2 == 0) {
-                    System.err.println("ADVERTENCIA: División por cero detectada en simulación.");
-                    return 0;
+                    System.err.println("ADVERTENCIA: División por cero detectada en simulación durante Constant Folding.");
+                    return 0; // Prevenir división por cero en tiempo de compilación para plegado
                 }
                 return val1 / val2;
             default:
-                return 0; 
+                return 0; // Operador desconocido
         }
     }
 
-    private boolean isNumericLiteral(String s) { 
+    /**
+     * Verifica si una cadena representa un literal numérico entero.
+     *
+     * @param s La cadena a verificar.
+     * @return true si la cadena es un literal numérico entero, false en caso contrario.
+     */
+    private boolean isNumericLiteral(String s) {
         try {
             Integer.parseInt(s);
             return true;
@@ -1149,6 +1220,14 @@ public class Parser {
     }
 
 
+    /**
+     * Recolecta una expresión para su posterior procesamiento de código intermedio,
+     * incluyendo la conversión a prefija y la generación de cuádruplos optimizados.
+     *
+     * @param exprTokens La lista de tokens de la expresión.
+     * @param finalTarget El destino final de la expresión (ej. nombre de variable, "print_target").
+     * @param lineNumber La línea donde comienza la expresión.
+     */
     private void collectExpression(List<Token> exprTokens, String finalTarget, int lineNumber) {
         if (exprTokens.isEmpty()) {
             return;
@@ -1156,6 +1235,7 @@ public class Parser {
 
         boolean isArithmetic = hasArithmeticOperators(exprTokens) || isSingleArithmeticOperand(exprTokens);
 
+        // Si la expresión no es aritmética, solo se manejan casos específicos como cadenas literales en print.
         if (!isArithmetic) {
             if (exprTokens.size() == 1 && exprTokens.get(0).type == CADENA_LITERAL && finalTarget.equals("print_target")) {
                 ExpressionData data = new ExpressionData(exprTokens, lineNumber);
@@ -1166,19 +1246,21 @@ public class Parser {
                 collectedExpressions.add(data);
                 return;
             }
-            return; 
+            return;
         }
 
         ExpressionData data = new ExpressionData(exprTokens, lineNumber);
 
+        // 1. Conversión a Prefija (para fines de demostración/depuración)
         ExpressionConversionResult prefixConversionResult = convertToPrefix(exprTokens);
         data.prefixExpression = tokensToString(prefixConversionResult.prefixTokens);
         data.prefixStackSimulation = prefixConversionResult.stackSimulation;
 
+        // 2. Generación de Cuádruplos con optimizaciones (Constant Folding y Propagación de Copias)
         QuadrupleGenerationResult quadResult = generateQuadruples(exprTokens, finalTarget);
         data.quadruples = quadResult.quadruples;
-        data.quadrupleStackSimulation = quadResult.stackSimulation; // Asegúrate de asignar la simulación de pila
-        data.numericResultsSimulation = quadResult.numericResults; 
+        data.quadrupleStackSimulation = quadResult.stackSimulation;
+        data.numericResultsSimulation = quadResult.numericResults;
 
         collectedExpressions.add(data);
     }
