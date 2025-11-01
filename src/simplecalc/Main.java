@@ -22,8 +22,26 @@ package simplecalc;
 
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import java.lang.Runtime;
+
 
 public class Main {
+    
+    public static void estadisticasSistema(){
+        // Obtener el objeto Runtime
+        Runtime runtime = Runtime.getRuntime();
+
+        // Constante para convertir bytes a megabytes
+        final double MB = 1024.0 * 1024.0;
+
+        // Mostrar estadísticas del sistema
+        System.out.println("\nESTADISTICAS DEL SISTEMA:");
+        System.out.println("   Procesadores disponibles: " + runtime.availableProcessors());
+        System.out.println("   Memoria maxima: " + (runtime.maxMemory() / MB) + " MB");
+        System.out.println("   Memoria total: " + (runtime.totalMemory() / MB) + " MB");
+        System.out.println("   Memoria libre: " + (runtime.freeMemory() / MB) + " MB");
+    }
+    
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -37,5 +55,8 @@ public class Main {
                 new SimpleCalcGUI().setVisible(true);
             }
         });
+        
+        estadisticasSistema();
+        
     }
 }
