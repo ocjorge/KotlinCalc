@@ -26,6 +26,9 @@ public class Parser {
     // **Optimización: Precompilación del patrón regex para la propagación de copias.**
     // Este patrón se usa repetidamente en getPropagatedValue para identificar asignaciones.
     private static final Pattern QUAD_ASSIGNMENT_PATTERN = Pattern.compile("(t\\d+) = (.+)");
+    // Patrón para identificar el destino y los argumentos de un cuádruplo para el análisis de usos.
+    // Usado para identificar operandos que son temporales en los cuádruplos finales.
+    private static final Pattern QUAD_OPERAND_IDENTIFIER_PATTERN = Pattern.compile("(t\\d+|[a-zA-Z_][a-zA-Z0-9_]*)"); // Para encontrar tX o IDs
 
 
     // Clase auxiliar para almacenar los datos de cada expresión
@@ -33,8 +36,8 @@ public class Parser {
         List<Token> infixTokens;
         String prefixExpression;
         List<String> prefixStackSimulation;
-        List<String> quadruples;
-        List<String> quadrupleStackSimulation;
+        List<String> quadruples; // Esta lista será la OPTIMIZADA
+        List<String> quadrupleStackSimulation; // Esta lista incluirá los pasos intermedios, incluso los que se optimizan fuera
         Map<String, Integer> numericResultsSimulation;
         int lineNumber;
 
@@ -42,7 +45,7 @@ public class Parser {
             this.infixTokens = new ArrayList<>(infixTokens);
             this.prefixExpression = "";
             this.prefixStackSimulation = new ArrayList<>();
-            this.quadruples = new ArrayList<>();
+            this.quadruples = new ArrayList<>(); // Vacía inicialmente, se llena después de la optimización
             this.quadrupleStackSimulation = new ArrayList<>();
             this.numericResultsSimulation = new HashMap<>();
             this.lineNumber = lineNumber;
@@ -63,16 +66,16 @@ public class Parser {
 
             sb.append("  Prefija: ").append(prefixExpression).append("\n");
 
-            sb.append("  Cuádruplos (Tres Direcciones):\n");
+            sb.append("  Cuádruplos (Tres Direcciones - Optimizados por CF, CP y DCE):\n");
             if (quadruples.isEmpty()) {
-                 sb.append("    (No aplica para esta expresión)\n");
+                 sb.append("    (No aplica para esta expresión / Todos optimizados o triviales)\n");
             } else {
                 for (String quad : quadruples) {
                     sb.append("    ").append(quad).append("\n");
                 }
             }
 
-            sb.append("  Simulación Pila (Generación Cuádruplos desde Infija):\n");
+            sb.append("  Simulación Pila (Generación Cuádruplos desde Infija - Pasos detallados):\n"); // Renombrado para diferenciar
             if (quadrupleStackSimulation.isEmpty() || quadrupleStackSimulation.size() <= 1) {
                 sb.append("    (No aplica / Trivial para esta expresión)\n");
             } else {
@@ -308,7 +311,7 @@ public class Parser {
         // Solo si el tipo es Int o una cadena literal simple (para PRINT).
         if (!exprType.equals("Unknown") && !exprType.equals("ErrorType") && (exprType.equals("Int") || (exprType.equals("String") && tokens.subList(exprStart, exprEnd).size() == 1 && tokens.subList(exprStart, exprEnd).get(0).type == CADENA_LITERAL))) {
             List<Token> subExprTokens = tokens.subList(exprStart, exprEnd);
-            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens) || (subExprTokens.size() == 1 && subExprTokens.get(0).type == CADENA_LITERAL)) {
+            if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
                 int lineNumber = subExprTokens.get(0).line;
                 collectExpression(subExprTokens, "print_target", lineNumber);
             }
@@ -386,7 +389,7 @@ public class Parser {
         if (!rangeStartType.equals("Unknown") && !rangeStartType.equals("ErrorType") && rangeStartType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeStartExprStart, rangeStartExprEnd);
             if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
-                int lineNumber = subExprTokens.get(0).line;
+                int lineNumber = subExprTokens.isEmpty() ? loopVarName.line : subExprTokens.get(0).line;
                 collectExpression(subExprTokens, "range_start", lineNumber);
             }
         }
@@ -401,7 +404,7 @@ public class Parser {
         if (!rangeEndType.equals("Unknown") && !rangeEndType.equals("ErrorType") && rangeEndType.equals("Int")) {
             List<Token> subExprTokens = tokens.subList(rangeEndExprStart, rangeEndExprEnd);
             if (hasArithmeticOperators(subExprTokens) || isSingleArithmeticOperand(subExprTokens)) {
-                int lineNumber = subExprTokens.get(0).line;
+                int lineNumber = subExprTokens.isEmpty() ? loopVarName.line : subExprTokens.get(0).line;
                 collectExpression(subExprTokens, "range_end", lineNumber);
             }
         }
@@ -845,8 +848,8 @@ public class Parser {
     // Clase para el resultado de la generación de cuádruplos
     private static class QuadrupleGenerationResult {
 
-        List<String> quadruples;
-        List<String> stackSimulation;
+        List<String> quadruples; // Esta es la lista de cuádruplos OPTIMIZADOS (con DCE)
+        List<String> stackSimulation; // Esta es la simulación detallada sin DCE
         Map<String, Integer> numericResults; // Para almacenar los valores calculados
 
         public QuadrupleGenerationResult(List<String> quadruples, List<String> stackSimulation, Map<String, Integer> numericResults) {
@@ -860,16 +863,21 @@ public class Parser {
      * Genera cuádruplos directamente desde una expresión infija, aplicando Constant Folding
      * y Propagación de Copias. También simula los resultados numéricos.
      *
+     * **Optimización Adicional: Eliminación de Código Muerto (temporales redundantes).**
+     * Después de la generación inicial y la aplicación de las optimizaciones en línea (CF y CP),
+     * se realiza un análisis de uso de temporales para eliminar los cuádruplos que asignan
+     * a temporales si esos temporales no son usados posteriormente en los cuádruplos finales.
+     *
      * @param infixTokens La lista de tokens de la expresión infija.
      * @param finalTarget El nombre de la variable o propósito (ej. "print_target") donde se almacenará el resultado final.
      * @return Un objeto QuadrupleGenerationResult con los cuádruplos generados, la simulación de pila y los resultados numéricos.
      */
     private QuadrupleGenerationResult generateQuadruples(List<Token> infixTokens, String finalTarget) {
-        List<String> quadruples = new ArrayList<>();
-        Stack<String> operandStack = new Stack<>(); // Guarda operandos (literales, IDs, temporales)
-        Stack<Token> operatorStack = new Stack<>(); // Guarda operadores
-        List<String> quadrupleStackSimulationSteps = new ArrayList<>();
-        Map<String, Integer> currentNumericValues = new HashMap<>(variableValues); // Copiar valores PERSISTENTES del parser
+        List<String> intermediateQuadruples = new ArrayList<>(); // Almacena todos los cuádruplos ANTES de DCE
+        Stack<String> operandStack = new Stack<>();
+        Stack<Token> operatorStack = new Stack<>();
+        List<String> quadrupleStackSimulationSteps = new ArrayList<>(); // Para la simulación detallada
+        Map<String, Integer> currentNumericValues = new HashMap<>(variableValues);
 
         int tempVarCounter = 0;
 
@@ -878,63 +886,56 @@ public class Parser {
         for (Token token : infixTokens) {
             String opStackState = operatorStack.isEmpty() ? "[]" : operatorStack.toString();
             String valStackState = operandStack.isEmpty() ? "[]" : operandStack.toString();
-            String generatedQuadForSim = "---"; // Inicializado para cada iteración del bucle for
+            String generatedQuadForSim = "---";
 
-            if (token.type == ID || token.type == NUMERO_ENTERO) { // Si es un operando (ID o número entero)
+            if (token.type == ID || token.type == NUMERO_ENTERO) {
                 operandStack.push(token.lexeme);
                 generatedQuadForSim = "Operando a pila: " + token.lexeme;
-            } else if (token.type == PAREN_IZQ) { // Si es paréntesis izquierdo, se empuja a la pila de operadores
+            } else if (token.type == PAREN_IZQ) {
                 operatorStack.push(token);
                 generatedQuadForSim = "Push PAREN_IZQ";
-            } else if (token.type == PAREN_DER) { // Si es paréntesis derecho, se procesan operadores hasta encontrar el paréntesis izquierdo
+            } else if (token.type == PAREN_DER) {
                 while (!operatorStack.isEmpty() && operatorStack.peek().type != PAREN_IZQ) {
-                    if (operandStack.size() < 2) { // Verificar suficientes operandos
+                    if (operandStack.size() < 2) {
                         quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Pila insuficiente para operador.", valStackState, opStackState, token.lexeme));
                         return new QuadrupleGenerationResult(new ArrayList<>(), quadrupleStackSimulationSteps, new HashMap<>());
                     }
-                    String arg2 = operandStack.pop(); // Sacar el segundo operando
-                    String arg1 = operandStack.pop(); // Sacar el primer operando
-                    Token op = operatorStack.pop();    // Sacar el operador
-                    String tempVar = "t" + (++tempVarCounter); // Generar una variable temporal
+                    String arg2 = operandStack.pop();
+                    String arg1 = operandStack.pop();
+                    Token op = operatorStack.pop();
+                    String tempVar = "t" + (++tempVarCounter);
 
-                    // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
-                    // Antes de generar el cuádruplo, intentamos obtener el valor más "constante" de cada argumento.
-                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
-                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
+                    String effectiveArg1 = getPropagatedValue(arg1, intermediateQuadruples, currentNumericValues, variableValues);
+                    String effectiveArg2 = getPropagatedValue(arg2, intermediateQuadruples, currentNumericValues, variableValues);
 
                     if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
-                        // Si ambos argumentos (después de la propagación) son literales numéricos,
-                        // podemos aplicar Constant Folding: la operación se realiza en tiempo de compilación.
                         int val1 = Integer.parseInt(effectiveArg1);
                         int val2 = Integer.parseInt(effectiveArg2);
-                        int result = evaluate(val1, val2, op.type); // Realizar la operación
-                        currentNumericValues.put(tempVar, result); // Almacenar el resultado plegado para futuras propagaciones
-                        String foldedQuad = String.format("%s = %d", tempVar, result); // Generar un cuádruplo simple
-                        quadruples.add(foldedQuad);
-                        operandStack.push(tempVar); // Empujar la temporal con el valor plegado
-                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]"; // Mensaje para simulación
+                        int result = evaluate(val1, val2, op.type);
+                        currentNumericValues.put(tempVar, result);
+                        String foldedQuad = String.format("%s = %d", tempVar, result);
+                        intermediateQuadruples.add(foldedQuad); // Agregamos a la lista intermedia
+                        operandStack.push(tempVar);
+                        generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]";
                     } else {
-                        // Si no se puede aplicar Constant Folding, se genera el cuádruplo normal.
-                        // Aún así, simulamos el cálculo numérico para la trazabilidad y los resultados.
                         int val1 = getNumericValueForSimulation(effectiveArg1, currentNumericValues);
                         int val2 = getNumericValueForSimulation(effectiveArg2, currentNumericValues);
                         int result = evaluate(val1, val2, op.type);
-                        currentNumericValues.put(tempVar, result); // Almacenar el resultado de la simulación
+                        currentNumericValues.put(tempVar, result);
 
                         String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
-                        quadruples.add(quad);
+                        intermediateQuadruples.add(quad); // Agregamos a la lista intermedia
                         operandStack.push(tempVar);
                         generatedQuadForSim = quad + " (Resultado: " + result + ")";
                     }
                 }
                 if (!operatorStack.isEmpty() && operatorStack.peek().type == PAREN_IZQ) {
-                    operatorStack.pop(); // Sacar el '(' de la pila
+                    operatorStack.pop();
                 } else {
                     quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Paréntesis no balanceados.", valStackState, opStackState, token.lexeme));
                     return new QuadrupleGenerationResult(new ArrayList<>(), quadrupleStackSimulationSteps, new HashMap<>());
                 }
-            } else if (isArithmeticOperator(token.type)) { // Si es un operador aritmético
-                // Procesar operadores en la pila con mayor o igual precedencia
+            } else if (isArithmeticOperator(token.type)) {
                 while (!operatorStack.isEmpty() && operatorStack.peek().type != PAREN_IZQ
                         && getOperatorPrecedence(operatorStack.peek().type) >= getOperatorPrecedence(token.type)) {
                     if (operandStack.size() < 2) {
@@ -946,9 +947,8 @@ public class Parser {
                     Token op = operatorStack.pop();
                     String tempVar = "t" + (++tempVarCounter);
 
-                    // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
-                    String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
-                    String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
+                    String effectiveArg1 = getPropagatedValue(arg1, intermediateQuadruples, currentNumericValues, variableValues);
+                    String effectiveArg2 = getPropagatedValue(arg2, intermediateQuadruples, currentNumericValues, variableValues);
 
                     if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
                         int val1 = Integer.parseInt(effectiveArg1);
@@ -956,7 +956,7 @@ public class Parser {
                         int result = evaluate(val1, val2, op.type);
                         currentNumericValues.put(tempVar, result);
                         String foldedQuad = String.format("%s = %d", tempVar, result);
-                        quadruples.add(foldedQuad);
+                        intermediateQuadruples.add(foldedQuad);
                         operandStack.push(tempVar);
                         generatedQuadForSim = foldedQuad + " (Resultado: " + result + ") [Constant Folded]";
                     } else {
@@ -966,12 +966,12 @@ public class Parser {
                         currentNumericValues.put(tempVar, result);
 
                         String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
-                        quadruples.add(quad);
+                        intermediateQuadruples.add(quad);
                         operandStack.push(tempVar);
                         generatedQuadForSim = quad + " (Resultado: " + result + ")";
                     }
                 }
-                operatorStack.push(token); // Empujar el operador actual
+                operatorStack.push(token);
             }
             quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | %s",
                     operandStack.isEmpty() ? "[]" : operandStack.toString(),
@@ -979,7 +979,6 @@ public class Parser {
                     token.lexeme, generatedQuadForSim));
         }
 
-        // Vaciar operadores restantes de la pila al final de la expresión
         while (!operatorStack.isEmpty()) {
             String generatedQuadForSimLocal = "---";
 
@@ -1001,9 +1000,8 @@ public class Parser {
             Token op = operatorStack.pop();
             String tempVar = "t" + (++tempVarCounter);
 
-            // --- OPTIMIZACIÓN: CONSTANT FOLDING Y PROPAGACIÓN DE COPIAS ---
-            String effectiveArg1 = getPropagatedValue(arg1, quadruples, currentNumericValues, variableValues);
-            String effectiveArg2 = getPropagatedValue(arg2, quadruples, currentNumericValues, variableValues);
+            String effectiveArg1 = getPropagatedValue(arg1, intermediateQuadruples, currentNumericValues, variableValues);
+            String effectiveArg2 = getPropagatedValue(arg2, intermediateQuadruples, currentNumericValues, variableValues);
 
             if (isNumericLiteral(effectiveArg1) && isNumericLiteral(effectiveArg2)) {
                 int val1 = Integer.parseInt(effectiveArg1);
@@ -1011,7 +1009,7 @@ public class Parser {
                 int result = evaluate(val1, val2, op.type);
                 currentNumericValues.put(tempVar, result);
                 String foldedQuad = String.format("%s = %d", tempVar, result);
-                quadruples.add(foldedQuad);
+                intermediateQuadruples.add(foldedQuad);
                 operandStack.push(tempVar);
                 generatedQuadForSimLocal = foldedQuad + " (Resultado: " + result + ") [Constant Folded]";
             } else {
@@ -1021,7 +1019,7 @@ public class Parser {
                 currentNumericValues.put(tempVar, result);
 
                 String quad = String.format("%s = %s %s %s", tempVar, effectiveArg1, op.lexeme, effectiveArg2);
-                quadruples.add(quad);
+                intermediateQuadruples.add(quad);
                 operandStack.push(tempVar);
                 generatedQuadForSimLocal = quad + " (Resultado: " + result + ")";
             }
@@ -1032,158 +1030,174 @@ public class Parser {
                     op.lexeme, generatedQuadForSimLocal));
         }
 
-        // Asignación final del resultado de la expresión a su destino (variable, print, etc.)
+        // --- Post-procesamiento: Manejo del resultado final y aplicación de DCE ---
+        List<String> finalCommittedQuadruples = new ArrayList<>(); // Estos son los cuádruplos que **realmente** se emitirán.
+        Set<String> temporariesUsedAsOperands = new HashSet<>();
+
+        String finalExpressionResultOperand = null; // El operando que representa el resultado final de la expresión
+        String propagatedFinalResultValue = null;   // El valor final después de toda la propagación
+
+        // Determinar el cuádruplo final (ej. `x = ...` o `PRINT ...`) y su valor propagado.
+        // Este cuádruplo final es crucial para el análisis de uso de temporales.
         if (!operandStack.isEmpty()) {
-            String finalExpressionResult = operandStack.pop();
-            // Aplicar Propagación de Copias al resultado final para obtener su forma más simple (ej. un literal numérico).
-            String propagatedFinalResult = getPropagatedValue(finalExpressionResult, quadruples, currentNumericValues, variableValues);
+            finalExpressionResultOperand = operandStack.pop();
+            propagatedFinalResultValue = getPropagatedValue(finalExpressionResultOperand, intermediateQuadruples, currentNumericValues, variableValues);
 
             if (finalTarget != null) {
-                // Actualizar el valor numérico persistente de la variable si el target es una variable y el resultado es constante.
                 if (finalTarget.equals("print_target")) {
-                    quadruples.add(String.format("PRINT %s", propagatedFinalResult));
+                    finalCommittedQuadruples.add(String.format("PRINT %s", propagatedFinalResultValue));
                 } else if (finalTarget.equals("range_start")) {
-                    quadruples.add(String.format("RANGE_START %s", propagatedFinalResult));
+                    finalCommittedQuadruples.add(String.format("RANGE_START %s", propagatedFinalResultValue));
                 } else if (finalTarget.equals("range_end")) {
-                    quadruples.add(String.format("RANGE_END %s", propagatedFinalResult));
+                    finalCommittedQuadruples.add(String.format("RANGE_END %s", propagatedFinalResultValue));
                 } else { // Es una asignación a una variable
-                    quadruples.add(String.format("%s = %s", finalTarget, propagatedFinalResult));
-                    // Si el resultado final es un literal, actualizar el valor persistente de la variable
-                    // Esto es clave para futuras propagaciones de constantes en otras expresiones.
-                    if (isNumericLiteral(propagatedFinalResult)) {
-                        variableValues.put(finalTarget, Integer.parseInt(propagatedFinalResult));
-                    } else { // Si no es un literal, se toma el valor simulado para trazabilidad.
-                        variableValues.put(finalTarget, getNumericValueForSimulation(propagatedFinalResult, currentNumericValues));
+                    finalCommittedQuadruples.add(String.format("%s = %s", finalTarget, propagatedFinalResultValue));
+                    // Actualizar `variableValues` para que las futuras expresiones puedan usar esta constante.
+                    if (isNumericLiteral(propagatedFinalResultValue)) {
+                        variableValues.put(finalTarget, Integer.parseInt(propagatedFinalResultValue));
+                    } else {
+                        variableValues.put(finalTarget, getNumericValueForSimulation(propagatedFinalResultValue, currentNumericValues));
                     }
                 }
                 quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | Asignación final: %s = %s [Optimized]",
-                                                                "[]", "[]", "FINAL", finalTarget, propagatedFinalResult));
+                                                                "[]", "[]", "FINAL", finalTarget, propagatedFinalResultValue));
             }
-        } else if (!infixTokens.isEmpty() && quadruples.isEmpty() && finalTarget != null) {
-            // Manejo de expresiones que son un solo operando (ej. `val x = 10`) y que no generaron cuádruplos intermedios.
-            String operand = tokensToString(infixTokens);
-            String propagatedOperand = getPropagatedValue(operand, quadruples, currentNumericValues, variableValues);
+        } else if (!infixTokens.isEmpty() && intermediateQuadruples.isEmpty() && finalTarget != null) {
+            // Caso de una expresión con un solo operando (ej. `val x = 10`)
+            finalExpressionResultOperand = tokensToString(infixTokens); // En este caso, el "operando" es la propia expresión simple
+            propagatedFinalResultValue = getPropagatedValue(finalExpressionResultOperand, intermediateQuadruples, currentNumericValues, variableValues);
 
             if (finalTarget.equals("print_target")) {
-                 quadruples.add(String.format("PRINT %s", propagatedOperand));
-                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | PRINT %s [Optimized]", propagatedOperand, propagatedOperand));
+                 finalCommittedQuadruples.add(String.format("PRINT %s", propagatedFinalResultValue));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | PRINT %s [Optimized]", propagatedFinalResultValue, propagatedFinalResultValue));
             } else if (finalTarget.equals("range_start")) {
-                 quadruples.add(String.format("RANGE_START %s", propagatedOperand));
-                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_START %s [Optimized]", propagatedOperand, propagatedOperand));
+                 finalCommittedQuadruples.add(String.format("RANGE_START %s", propagatedFinalResultValue));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_START %s [Optimized]", propagatedFinalResultValue, propagatedFinalResultValue));
             } else if (finalTarget.equals("range_end")) {
-                 quadruples.add(String.format("RANGE_END %s", propagatedOperand));
-                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_END %s [Optimized]", propagatedOperand, propagatedOperand));
-            } else { // Asignación a una variable
-                 quadruples.add(String.format("%s = %s", finalTarget, propagatedOperand));
-                 if (isNumericLiteral(propagatedOperand)) {
-                    variableValues.put(finalTarget, Integer.parseInt(propagatedOperand));
+                 finalCommittedQuadruples.add(String.format("RANGE_END %s", propagatedFinalResultValue));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | RANGE_END %s [Optimized]", propagatedFinalResultValue, propagatedFinalResultValue));
+            } else {
+                 finalCommittedQuadruples.add(String.format("%s = %s", finalTarget, propagatedFinalResultValue));
+                 if (isNumericLiteral(propagatedFinalResultValue)) {
+                    variableValues.put(finalTarget, Integer.parseInt(propagatedFinalResultValue));
                  } else {
-                    variableValues.put(finalTarget, getNumericValueForSimulation(propagatedOperand, currentNumericValues));
+                    variableValues.put(finalTarget, getNumericValueForSimulation(propagatedFinalResultValue, currentNumericValues));
                  }
-                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | %s = %s [Optimized]", propagatedOperand, finalTarget, propagatedOperand));
+                 quadrupleStackSimulationSteps.add(String.format("[] | [] | %-15s | %s = %s [Optimized]", propagatedFinalResultValue, finalTarget, propagatedFinalResultValue));
             }
         }
 
-        return new QuadrupleGenerationResult(quadruples, quadrupleStackSimulationSteps, currentNumericValues);
+
+        // --- ANÁLISIS DE USO DE TEMPORALES PARA DCE ---
+        // 1. Recopilar todas las temporales *usadas* en los `finalCommittedQuadruples`.
+        // Esto identifica qué temporales son realmente necesarias para el resultado final.
+        for (String quad : finalCommittedQuadruples) {
+            Matcher m = QUAD_OPERAND_IDENTIFIER_PATTERN.matcher(quad);
+            while (m.find()) {
+                String operand = m.group(1).trim();
+                if (operand.startsWith("t") && !isNumericLiteral(operand)) { // Solo nos interesan las temporales
+                    temporariesUsedAsOperands.add(operand);
+                }
+            }
+        }
+
+        // 2. Filtrar `intermediateQuadruples` para construir la lista `trulyOptimizedQuadruples`.
+        // Solo incluimos cuádruplos intermedios si su temporal de destino es usada en los cuádruplos finales.
+        List<String> trulyOptimizedQuadruples = new ArrayList<>();
+        for (String quad : intermediateQuadruples) {
+            Matcher assignMatcher = QUAD_ASSIGNMENT_PATTERN.matcher(quad);
+            if (assignMatcher.find()) {
+                String definedTemp = assignMatcher.group(1).trim(); // Captura "tX"
+                // Si la temporal `definedTemp` se define aquí Y es usada en los cuádruplos finales, la mantenemos.
+                if (temporariesUsedAsOperands.contains(definedTemp)) {
+                    trulyOptimizedQuadruples.add(quad);
+                }
+            } else {
+                // Cuádruplos que no son asignaciones directas a temporales (ej. PRINT) o no tienen un patrón claro,
+                // por simplicidad y robustez, los mantenemos si no están ya en finalCommittedQuadruples.
+                // Sin embargo, para este nivel de analizador, todos los intermedios son asignaciones a tX.
+                // Si hubiera otros tipos (saltos, etc.), se necesitaría un manejo más detallado.
+                // Para el caso de cuádruplos aritméticos, `tX = arg1 op arg2`, si `tX` no es usado, se elimina.
+                // Si no es una asignación a `tX`, no debería estar en `intermediateQuadruples` con la lógica actual.
+            }
+        }
+        
+        // Finalmente, añadir los `finalCommittedQuadruples` a la lista.
+        // Esto asegura que la asignación final o el PRINT siempre estén presentes.
+        for(String quad : finalCommittedQuadruples) {
+            // Evitar duplicados si por alguna razón un cuádruplo final ya fue añadido como intermedio (ej. tX = Y y luego Z = tX, si Z=Y)
+            if (!trulyOptimizedQuadruples.contains(quad)) {
+                trulyOptimizedQuadruples.add(quad);
+            }
+        }
+
+        return new QuadrupleGenerationResult(trulyOptimizedQuadruples, quadrupleStackSimulationSteps, currentNumericValues);
     }
 
     /**
      * Aplica la optimización de Propagación de Copias para obtener el valor más actualizado y directo de un operando.
-     * Esto es fundamental para el Constant Folding, ya que convierte referencias a variables o temporales
-     * a literales numéricos cuando sea posible, permitiendo que `isNumericLiteral` los detecte.
-     *
-     * Busca en:
-     * 1.  Cuádruplos ya generados en la *expresión actual* (para temporales como `t1 = t2`).
-     * 2.  Valores numéricos de temporales y variables ya calculados en la *expresión actual*.
-     * 3.  Valores persistentes de variables globales (declaradas previamente en el programa).
+     * Es crucial para el Constant Folding al convertir referencias a variables/temporales a literales numéricos.
      *
      * @param operand El operando original (puede ser un ID, un literal, o una variable temporal tX).
-     * @param currentQuadruples La lista de cuádruplos generados hasta el momento para la expresión actual.
+     * @param intermediateQuadruples La lista de cuádruplos generados hasta el momento para la expresión actual.
      * @param currentNumericValues Mapa de valores numéricos de temporales y variables calculados en esta expresión.
      * @param globalVariableValues Mapa de valores persistentes de variables globales.
-     * @return El valor propagado del operando (será un literal numérico si se logró propagar un valor constante,
-     *         o el operando original si no se encontró un valor constante propagable).
+     * @return El valor propagado del operando (literal numérico si es constante, o el operando original).
      */
-    private String getPropagatedValue(String operand, List<String> currentQuadruples, Map<String, Integer> currentNumericValues, Map<String, Integer> globalVariableValues) {
+    private String getPropagatedValue(String operand, List<String> intermediateQuadruples, Map<String, Integer> currentNumericValues, Map<String, Integer> globalVariableValues) {
         String effectiveValue = operand;
         boolean changed;
 
-        // Bucle do-while para manejar cadenas de propagación (ej. t1 = t2, t2 = t3, t3 = 5).
-        // Itera hasta que no se puedan realizar más propagaciones directas desde los cuádruplos existentes.
         do {
             changed = false;
-            // Buscar propagación en los cuádruplos *actuales* generados en esta misma expresión.
-            // Esto es eficiente porque `currentQuadruples` es pequeña (solo los cuádruplos de la expresión actual).
-            for (int i = currentQuadruples.size() - 1; i >= 0; i--) { // Recorrer inversamente para encontrar la definición más reciente
-                String quad = currentQuadruples.get(i);
-                // Usar el patrón regex precompilado
+            for (int i = intermediateQuadruples.size() - 1; i >= 0; i--) { // Recorrer inversamente para la definición más reciente
+                String quad = intermediateQuadruples.get(i);
                 Matcher m = QUAD_ASSIGNMENT_PATTERN.matcher(quad);
                 if (m.find()) {
-                    String resultVar = m.group(1).trim(); // La variable temporal que recibe el valor (ej. "t1")
-                    String sourceVal = m.group(2).trim(); // El valor fuente (ej. "5", "t2", "variableX")
+                    String resultVar = m.group(1).trim();
+                    String sourceVal = m.group(2).trim();
 
-                    // Si el operando que buscamos (`effectiveValue`) es la variable destino (`resultVar`)
-                    // y el valor fuente es diferente, propagamos el valor fuente.
                     if (resultVar.equals(effectiveValue) && !sourceVal.equals(effectiveValue)) {
                         effectiveValue = sourceVal;
-                        changed = true; // Se encontró una propagación, se necesita otra iteración del do-while.
-                        break; // Salir del for para re-evaluar con el nuevo effectiveValue.
+                        changed = true;
+                        break;
                     }
                 }
             }
-        } while (changed); // Continuar propagando hasta que no se encuentren más cambios directos en los cuádruplos.
+        } while (changed);
 
-
-        // Después de la propagación local, si el `effectiveValue` aún no es un literal numérico
-        // y es una variable declarada (no una temporal 'tX'), intentamos obtener su valor desde
-        // el mapa de valores persistentes de las variables globales (`variableValues`).
-        // Esto es crucial para `val x = 10; val y = x + 5;` -> `x` se convierte en `10`.
         if (globalVariableValues.containsKey(effectiveValue) && !effectiveValue.startsWith("t") && !isNumericLiteral(effectiveValue)) {
             Integer val = globalVariableValues.get(effectiveValue);
             if (val != null) {
-                return String.valueOf(val); // Devolver el valor numérico como String
+                return String.valueOf(val);
             }
         }
 
-        // Si no se pudo propagar a un literal numérico, se devuelve el effectiveValue actual.
         return effectiveValue;
     }
 
 
     /**
      * Intenta obtener el valor numérico de un operando para propósitos de simulación y Constant Folding.
-     * Prioriza literales, luego valores calculados de temporales en la expresión actual (`currentNumericValues`),
-     * y finalmente valores persistentes de variables globales (`variableValues`).
-     *
-     * @param operand El operando como String (puede ser un literal, un ID, o una temporal tX).
-     * @param currentNumericValues Mapa de valores numéricos de temporales y variables calculados en esta expresión.
-     * @return El valor entero del operando, o 0 si no se puede determinar (como valor por defecto para simulación).
      */
     private int getNumericValueForSimulation(String operand, Map<String, Integer> currentNumericValues) {
         try {
-            return Integer.parseInt(operand); // Si es un literal numérico directamente
+            return Integer.parseInt(operand);
         } catch (NumberFormatException e) {
-            // Si no es un literal, buscar en los valores calculados de la expresión actual (temporales, etc.)
             if (currentNumericValues.containsKey(operand)) {
                 Integer val = currentNumericValues.get(operand);
                 return (val != null) ? val : 0;
             }
-            // Si no se encontró en la expresión actual, buscar en los valores persistentes de variables globales
             if (variableValues.containsKey(operand)) {
                 Integer val = variableValues.get(operand);
                 return (val != null) ? val : 0;
             }
-            return 0; // Valor por defecto si no se puede determinar para simulación
+            return 0;
         }
     }
 
     /**
      * Realiza la operación aritmética.
-     *
-     * @param val1 Primer operando.
-     * @param val2 Segundo operando.
-     * @param opType Tipo de operador.
-     * @return Resultado de la operación.
      */
     private int evaluate(int val1, int val2, Token.TokenType opType) {
         switch (opType) {
@@ -1196,19 +1210,16 @@ public class Parser {
             case OP_DIV:
                 if (val2 == 0) {
                     System.err.println("ADVERTENCIA: División por cero detectada en simulación durante Constant Folding.");
-                    return 0; // Prevenir división por cero en tiempo de compilación para plegado
+                    return 0;
                 }
                 return val1 / val2;
             default:
-                return 0; // Operador desconocido
+                return 0;
         }
     }
 
     /**
      * Verifica si una cadena representa un literal numérico entero.
-     *
-     * @param s La cadena a verificar.
-     * @return true si la cadena es un literal numérico entero, false en caso contrario.
      */
     private boolean isNumericLiteral(String s) {
         try {
@@ -1223,10 +1234,6 @@ public class Parser {
     /**
      * Recolecta una expresión para su posterior procesamiento de código intermedio,
      * incluyendo la conversión a prefija y la generación de cuádruplos optimizados.
-     *
-     * @param exprTokens La lista de tokens de la expresión.
-     * @param finalTarget El destino final de la expresión (ej. nombre de variable, "print_target").
-     * @param lineNumber La línea donde comienza la expresión.
      */
     private void collectExpression(List<Token> exprTokens, String finalTarget, int lineNumber) {
         if (exprTokens.isEmpty()) {
@@ -1235,7 +1242,6 @@ public class Parser {
 
         boolean isArithmetic = hasArithmeticOperators(exprTokens) || isSingleArithmeticOperand(exprTokens);
 
-        // Si la expresión no es aritmética, solo se manejan casos específicos como cadenas literales en print.
         if (!isArithmetic) {
             if (exprTokens.size() == 1 && exprTokens.get(0).type == CADENA_LITERAL && finalTarget.equals("print_target")) {
                 ExpressionData data = new ExpressionData(exprTokens, lineNumber);
@@ -1251,14 +1257,12 @@ public class Parser {
 
         ExpressionData data = new ExpressionData(exprTokens, lineNumber);
 
-        // 1. Conversión a Prefija (para fines de demostración/depuración)
         ExpressionConversionResult prefixConversionResult = convertToPrefix(exprTokens);
         data.prefixExpression = tokensToString(prefixConversionResult.prefixTokens);
         data.prefixStackSimulation = prefixConversionResult.stackSimulation;
 
-        // 2. Generación de Cuádruplos con optimizaciones (Constant Folding y Propagación de Copias)
         QuadrupleGenerationResult quadResult = generateQuadruples(exprTokens, finalTarget);
-        data.quadruples = quadResult.quadruples;
+        data.quadruples = quadResult.quadruples; // Ahora esta lista contiene los cuádruplos optimizados
         data.quadrupleStackSimulation = quadResult.stackSimulation;
         data.numericResultsSimulation = quadResult.numericResults;
 
