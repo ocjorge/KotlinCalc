@@ -52,25 +52,54 @@ public class SimpleCalcGUI extends JFrame {
         LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
         inputScrollPane.setRowHeaderView(lineNumbers);
 
-        inputArea.setText("fun main() {\n" +
-                "    val a: Int = 10\n" +
-                "    var b: Int = a + 2 * 5\n" +
-                "    val c: Int = (b - 3) / 2\n" +
-                "    print(\"El valor de c es: \")\n" +
+inputArea.setText("fun main() {\n" +
+                "    val valorInicial: Int = 100\n" +
+                "    val constante1: Int = 5 + 3\n" +
+                "    var constante2: Int = (20 / 4) * 2\n" +
+                "    \n" +
+                "    print(\"Constante 1: \")\n" +
+                "    print(constante1)\n" +
+                "    print(\"\\nConstante 2: \")\n" +
+                "    print(constante2)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    val a: Int = valorInicial\n" +
+                "    var b: Int = a\n" +
+                "    var c: Int = b + constante1\n" +
+                "    \n" +
+                "    print(\"Valor de c: \")\n" +
                 "    print(c)\n" +
                 "    print(\"\\n\")\n" +
-                "    var x: Int = 0\n" +
-                "    while (x < 3) {\n" +
-                "        x = x + 1\n" +
-                "        print(\"x en while: \")\n" +
-                "        print(x)\n" +
-                "        print(\"\\n\")\n" +
-                "    }\n" +
-                "    val mensaje: String = \"Resultado: \"  \n" +
-                "    print(mensaje)\n" +
+                "\n" +
+                "    val d: Int = 10\n" +
+                "    var e: Int = d * (constante1 - 2)\n" +
+                "    \n" +
+                "    print(\"Valor de e: \")\n" +
+                "    print(e)\n" +
                 "    print(\"\\n\")\n" +
-                "    val cadenaSimple: String = \"Solo texto\"\n" +
-                "    print(cadenaSimple)\n" +
+                "\n" +
+                "    var f: Int = e\n" +
+                "    val g: Int = f / 2 + constante2\n" +
+                "    \n" +
+                "    print(\"Valor de g: \")\n" +
+                "    print(g)\n" +
+                "    print(\"\\n\")\n" +
+                "    \n" +
+                "    val h: Int = a\n" +
+                "    var i: Int = h + b\n" +
+                "    \n" +
+                "    print(\"Valor de i: \")\n" +
+                "    print(i)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    val k: Int = 7\n" +
+                "    var l: Int = k * (a + 3) - (b / c)\n" +
+                "    \n" +
+                "    print(\"Valor de l: \")\n" +
+                "    print(l)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n" +
                 "}");
 
         outputArea = new JTextArea();
