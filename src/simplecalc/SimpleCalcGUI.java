@@ -15,8 +15,8 @@ import java.util.regex.Pattern;
 import java.util.HashSet;
 import java.util.Set;
 
-
 public class SimpleCalcGUI extends JFrame {
+
     private JTextArea inputArea;
     private JTextArea outputArea;
     private JLabel statusLabel;
@@ -27,10 +27,9 @@ public class SimpleCalcGUI extends JFrame {
     private int lastUniqueTempVars;
     private long lastCompilationDurationMs;
 
-
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1200, 700); 
+        setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -52,26 +51,19 @@ public class SimpleCalcGUI extends JFrame {
         LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
         inputScrollPane.setRowHeaderView(lineNumbers);
 
-        inputArea.setText("fun main() {\n" +
-                "    val a: Int = 10\n" +
-                "    var b: Int = a + 2 * 5\n" +
-                "    val c: Int = (b - 3) / 2\n" +
-                "    print(\"El valor de c es: \")\n" +
-                "    print(c)\n" +
-                "    print(\"\\n\")\n" +
-                "    var x: Int = 0\n" +
-                "    while (x < 3) {\n" +
-                "        x = x + 1\n" +
-                "        print(\"x en while: \")\n" +
-                "        print(x)\n" +
-                "        print(\"\\n\")\n" +
-                "    }\n" +
-                "    val mensaje: String = \"Resultado: \"  \n" +
-                "    print(mensaje)\n" +
-                "    print(\"\\n\")\n" +
-                "    val cadenaSimple: String = \"Solo texto\"\n" +
-                "    print(cadenaSimple)\n" +
-                "}");
+        inputArea.setText("fun main() {\n"
+                + " val a: Int = 10\n"
+                + "val b: Int = a\n"
+                + // b es una copia de a
+                "var c: Int = b + 5\n"
+                + // Si b se propaga, esto sería: c = a + 5 (menos un cuádruplo de copia)
+                "val x: Int = a\n"
+                + "val y: Int = x\n"
+                + "val z: Int = y * 2\n"
+                + // Si y se propaga a x, y x a a, sería: z = a * 2
+                "\n"
+                + "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n"
+                + "}");
 
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -110,12 +102,12 @@ public class SimpleCalcGUI extends JFrame {
                 processSemanticAnalysis();
             }
         });
-        
+
         JButton generateIntermediateButton = new JButton("Generar Intermedio");
         generateIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                generateIntermediateCode(); 
+                generateIntermediateCode();
             }
         });
 
@@ -127,7 +119,6 @@ public class SimpleCalcGUI extends JFrame {
                 displayMetrics(); // Nuevo método para mostrar métricas
             }
         });
-
 
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
@@ -144,7 +135,7 @@ public class SimpleCalcGUI extends JFrame {
                 clearEditorAndOutput();
             }
         });
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
@@ -183,17 +174,17 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
-        List<String> allParserErrors = parser.getErrors(); 
+        parser.parse();
+        List<String> allParserErrors = parser.getErrors();
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -236,7 +227,7 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Tokens Reconocidos ---\n");
         sb.append(Token.getTableHeader()).append("\n");
@@ -248,10 +239,10 @@ public class SimpleCalcGUI extends JFrame {
         sb.append(Token.getTableFooter()).append("\n\n");
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -283,20 +274,20 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
-                                              .filter(err -> !err.contains("Error semántico")) 
-                                              .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -306,7 +297,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -341,23 +332,23 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
-        List<String> allParserErrors = parser.getErrors(); 
+        List<String> allParserErrors = parser.getErrors();
         List<String> semanticErrors = allParserErrors.stream()
-                                               .filter(err -> err.contains("Error semántico"))
-                                               .collect(Collectors.toList());
+                .filter(err -> err.contains("Error semántico"))
+                .collect(Collectors.toList());
         List<String> syntaxErrors = allParserErrors.stream()
-                                                .filter(err -> !err.contains("Error semántico"))
-                                                .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -367,7 +358,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -399,7 +390,7 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
     }
-    
+
     // --- MODIFICADO: generateIntermediateCode para almacenar métricas ---
     private void generateIntermediateCode() {
         outputArea.setText("");
@@ -410,13 +401,13 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         // --- Inicia medición de tiempo ---
         long startTime = System.nanoTime();
@@ -451,8 +442,8 @@ public class SimpleCalcGUI extends JFrame {
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
             int currentTotalQuadruples = 0;
-            Set<String> currentUniqueTempVars = new HashSet<>(); 
-            
+            Set<String> currentUniqueTempVars = new HashSet<>();
+
             if (expressions.isEmpty()) {
                 sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
@@ -461,7 +452,7 @@ public class SimpleCalcGUI extends JFrame {
                     sb.append("Expresión #").append(i + 1).append(" ");
                     sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
-                    
+
                     currentTotalQuadruples += data.quadruples.size();
                     // Contar temporales únicas
                     Pattern p = Pattern.compile("t\\d+");
@@ -473,7 +464,7 @@ public class SimpleCalcGUI extends JFrame {
                     }
                 }
             }
-            
+
             // Almacenar métricas para el botón "Mostrar Métricas"
             lastTotalQuadruples = currentTotalQuadruples;
             lastUniqueTempVars = currentUniqueTempVars.size();
@@ -491,7 +482,7 @@ public class SimpleCalcGUI extends JFrame {
     private void displayMetrics() {
         outputArea.setText(""); // Limpiar la salida anterior
         inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
         sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
@@ -505,7 +496,6 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLUE); // Un color distinto para métricas
     }
 
-
     private void highlightErrorFromMessage(String errorMessage) {
         try {
             if (errorMessage.startsWith("[")) {
@@ -513,10 +503,10 @@ public class SimpleCalcGUI extends JFrame {
                 String[] parts = locationPart.split(",");
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                
+
                 String lexemeToHighlight = "";
                 int lexemeLength = 1;
-                
+
                 int startLexicalError = errorMessage.indexOf("Error Léxico: '");
                 if (startLexicalError != -1) {
                     startLexicalError += "Error Léxico: '".length();
@@ -528,17 +518,17 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
                 if (startSyntaxSemanticError != -1) {
-                     startSyntaxSemanticError += "Error en '".length();
-                     int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
-                     if (endSyntaxSemanticError != -1) {
-                         lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
-                         lexemeLength = lexemeToHighlight.length();
-                         highlightError(line, col, lexemeLength);
-                         return;
-                     }
+                    startSyntaxSemanticError += "Error en '".length();
+                    int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
+                    if (endSyntaxSemanticError != -1) {
+                        lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
+                        lexemeLength = lexemeToHighlight.length();
+                        highlightError(line, col, lexemeLength);
+                        return;
+                    }
                 }
                 int startSemanticErrorNear = errorMessage.indexOf("Error semántico cerca de '");
                 if (startSemanticErrorNear != -1) {
@@ -551,7 +541,7 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 highlightError(line, col, 1);
 
             }
@@ -571,16 +561,16 @@ public class SimpleCalcGUI extends JFrame {
 
             int startOffset = inputArea.getLineStartOffset(docLine) + docCol;
             int endOffset = startOffset + length;
-            
-            if (startOffset < inputArea.getDocument().getLength()) {
-                 endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
-                 endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
 
-                 if(startOffset < endOffset){
-                     inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
-                 } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()){
-                     inputArea.getHighlighter().addHighlight(startOffset, startOffset +1, errorPainter);
-                 }
+            if (startOffset < inputArea.getDocument().getLength()) {
+                endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
+                endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
+
+                if (startOffset < endOffset) {
+                    inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
+                } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()) {
+                    inputArea.getHighlighter().addHighlight(startOffset, startOffset + 1, errorPainter);
+                }
             }
 
         } catch (BadLocationException ex) {
@@ -622,5 +612,4 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLACK);
     }
 
-    
 }
