@@ -9,11 +9,10 @@ Salgado Rojas Marelin Iral
 Lenguajes y Automatas II
 Profa: Martínez Moreno Martha
 
-Avance 2: se genera la validación por código intermedio
-Transforma operaciones aritméticas de infija a prefija
-Utiliza cuadruplos para manejar las operaciones aritmeticas
-Almacena variables temporales para asignar los valores a variables declaradas
-Branch: Prefija.
+Avance 3: se genera la optimización del código intermedio
+Simulación de resultados numéricos acumulativos para variables
+timizaciones de Constant Folding y Copy Propagation en la generación de cuádruplos
+Branch: OptimizaciónCodigo.
 
 
 */

@@ -21,6 +21,9 @@ public class Parser {
 
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
     
+    // NUEVO: Contador de operaciones plegadas
+    public int foldedOperationsCount; // Hacemos que sea público para que la GUI lo lea
+
     // Clase auxiliar para almacenar los datos de cada expresión
     public static class ExpressionData { 
         List<Token> infixTokens;
@@ -102,6 +105,7 @@ public class Parser {
         variableTypes.clear(); 
         variableValues.clear(); 
         collectedExpressions.clear(); 
+        foldedOperationsCount = 0; // Reiniciar contador de optimizaciones
         
         try {
             programa();
@@ -865,7 +869,7 @@ public class Parser {
         for (Token token : infixTokens) {
             String opStackState = operatorStack.isEmpty() ? "[]" : operatorStack.toString();
             String valStackState = operandStack.isEmpty() ? "[]" : operandStack.toString();
-            String generatedQuadForSim = "---"; // Inicializar aquí
+            String generatedQuadForSim = "---"; // Inicializado para cada iteración
 
             if (token.type == ID || token.type == NUMERO_ENTERO) { // Solo operandos aritméticos (ID, NUMERO)
                 operandStack.push(token.lexeme);
@@ -966,7 +970,7 @@ public class Parser {
 
         // Vaciar operadores restantes de la pila
         while (!operatorStack.isEmpty()) {
-            String generatedQuadForSimLocal = "---"; // Inicializar para este ámbito
+            String generatedQuadForSimLocal = "---"; 
 
             if (operatorStack.peek().type == PAREN_IZQ || operatorStack.peek().type == PAREN_DER) {
                 quadrupleStackSimulationSteps.add(String.format("%-20s | %-20s | %-15s | ERROR: Paréntesis no balanceados al final.",
@@ -1110,11 +1114,10 @@ public class Parser {
                 Integer val = currentNumericValues.get(operand);
                 return (val != null) ? val : 0; 
             }
-            if (variableValues.containsKey(operand)) { // Valor de variable global
+            if (variableValues.containsKey(operand)) { 
                 Integer val = variableValues.get(operand);
                 return (val != null) ? val : 0; 
             }
-            // Si es un ID que no es numérico o no tiene valor aún, devolver 0 para no romper simulación
             return 0; 
         }
     }
