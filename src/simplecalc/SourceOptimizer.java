@@ -10,10 +10,10 @@ public class SourceOptimizer {
     private List<String> sourceLines;
     private Map<String, VariableInfo> variableTable;
     private Set<Integer> linesToRemove;
-    private Map<String, String> constantPropagation; // variable -> valor constante propagado
+    private Map<String, String> constantPropagation;
+    private Set<String> variablesAvailableAtLine; // NUEVO: tracking de variables disponibles
     private OptimizationResult result;
 
-    // Patrones regex para análisis
     private static final Pattern VAL_VAR_PATTERN
             = Pattern.compile("^\\s*(val|var)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*:\\s*(Int|String)\\s*=\\s*(.+)$");
     private static final Pattern ASSIGNMENT_PATTERN
@@ -27,33 +27,23 @@ public class SourceOptimizer {
         this.variableTable = new LinkedHashMap<>();
         this.linesToRemove = new HashSet<>();
         this.constantPropagation = new HashMap<>();
+        this.variablesAvailableAtLine = new LinkedHashSet<>();
         this.result = new OptimizationResult();
         this.result.setOriginalLines(sourceLines.size());
     }
 
     public OptimizationResult optimize() {
         try {
-            // Fase 1: Construir tabla de símbolos y analizar usos
             buildSymbolTable();
-
-            // Fase 2: Propagar constantes
             performConstantPropagation();
-
-            // Fase 3: Eliminar código muerto
             eliminateDeadCode();
-
-            // Fase 4: Generar código optimizado
             String optimizedCode = generateOptimizedSource();
             result.setOptimizedSource(optimizedCode);
-
-            // Fase 5: Contar líneas finales
             result.setOptimizedLines(optimizedCode.split("\n").length);
-
         } catch (Exception e) {
             result.setError("Error durante la optimización: " + e.getMessage());
             e.printStackTrace();
         }
-
         return result;
     }
 
@@ -67,15 +57,12 @@ public class SourceOptimizer {
             String line = sourceLines.get(i).trim();
             int lineNumber = i + 1;
 
-            // Detectar declaraciones val/var
             Matcher declMatcher = VAL_VAR_PATTERN.matcher(line);
             if (declMatcher.find()) {
-                String type = declMatcher.group(1); // val o var
+                String type = declMatcher.group(1);
                 String varName = declMatcher.group(2);
-                String dataType = declMatcher.group(3); // Int o String
+                String dataType = declMatcher.group(3);
                 String value = declMatcher.group(4).trim();
-
-                // Limpiar el valor (quitar comentarios, espacios, etc.)
                 value = cleanValue(value);
 
                 VariableInfo info = new VariableInfo(varName, type, dataType, value, lineNumber);
@@ -83,7 +70,6 @@ public class SourceOptimizer {
                 continue;
             }
 
-            // Detectar asignaciones a variables ya declaradas
             Matcher assignMatcher = ASSIGNMENT_PATTERN.matcher(line);
             if (assignMatcher.find()) {
                 String varName = assignMatcher.group(1);
@@ -95,14 +81,11 @@ public class SourceOptimizer {
                 }
             }
 
-            // Detectar usos de variables (en cualquier contexto)
             Matcher usageMatcher = VARIABLE_USAGE_PATTERN.matcher(line);
             while (usageMatcher.find()) {
                 String possibleVar = usageMatcher.group(1);
 
-                // Excluir keywords y la propia declaración
                 if (!keywords.contains(possibleVar) && variableTable.containsKey(possibleVar)) {
-                    // Verificar que no sea la misma línea de declaración
                     VariableInfo info = variableTable.get(possibleVar);
                     if (info.getDeclarationLine() != lineNumber) {
                         info.addUsage(lineNumber);
@@ -113,7 +96,6 @@ public class SourceOptimizer {
     }
 
     private String cleanValue(String value) {
-        // Remover comentarios inline si existen
         int commentIndex = value.indexOf("//");
         if (commentIndex != -1) {
             value = value.substring(0, commentIndex);
@@ -122,10 +104,9 @@ public class SourceOptimizer {
     }
 
     private void performConstantPropagation() {
-        // Iterar hasta que no haya más cambios (punto fijo)
         boolean changed;
         int iterations = 0;
-        final int MAX_ITERATIONS = 100; // Prevenir loops infinitos
+        final int MAX_ITERATIONS = 100;
 
         do {
             changed = false;
@@ -139,15 +120,13 @@ public class SourceOptimizer {
             for (VariableInfo var : variableTable.values()) {
                 String currentValue = var.getAssignedValue();
 
-                // Si el valor es un literal numérico, propagarlo
                 if (isNumericLiteral(currentValue)) {
                     if (!constantPropagation.containsKey(var.getName())) {
                         constantPropagation.put(var.getName(), currentValue);
                         result.addPropagatedValue(var.getName(), currentValue);
                         changed = true;
                     }
-                } // Si el valor es otra variable que ya tiene constante propagada
-                else if (variableTable.containsKey(currentValue)) {
+                } else if (variableTable.containsKey(currentValue)) {
                     if (constantPropagation.containsKey(currentValue)) {
                         String propagatedValue = constantPropagation.get(currentValue);
                         var.setAssignedValue(propagatedValue);
@@ -155,9 +134,7 @@ public class SourceOptimizer {
                         result.addPropagatedValue(var.getName(), propagatedValue);
                         changed = true;
                     }
-                } // Si el valor es una expresión simple de una variable conocida
-                else if (currentValue.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
-                    // Es una simple copia de otra variable
+                } else if (currentValue.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
                     if (constantPropagation.containsKey(currentValue)) {
                         String propagatedValue = constantPropagation.get(currentValue);
                         var.setAssignedValue(propagatedValue);
@@ -174,9 +151,6 @@ public class SourceOptimizer {
         for (Map.Entry<String, VariableInfo> entry : variableTable.entrySet()) {
             VariableInfo var = entry.getValue();
 
-            // Una variable está "muerta" si:
-            // 1. Nunca se usa (no tiene líneas de uso)
-            // 2. Solo se usa para asignar a otras variables que también están muertas
             if (!var.isUsed()) {
                 var.setDead(true);
                 linesToRemove.add(var.getDeclarationLine());
@@ -189,30 +163,34 @@ public class SourceOptimizer {
         StringBuilder optimized = new StringBuilder();
         int consecutiveBlankLines = 0;
         int blankLinesRemoved = 0;
+        variablesAvailableAtLine.clear(); // Reset para tracking
 
         for (int i = 0; i < sourceLines.size(); i++) {
             int lineNumber = i + 1;
             String line = sourceLines.get(i);
 
-            // Si la línea debe eliminarse (código muerto), saltarla
             if (linesToRemove.contains(lineNumber)) {
                 continue;
             }
 
-            // Controlar líneas en blanco consecutivas (máximo 1)
             if (line.trim().isEmpty()) {
                 consecutiveBlankLines++;
                 if (consecutiveBlankLines > 1) {
                     blankLinesRemoved++;
-                    continue; // No agregar más de una línea en blanco consecutiva
+                    continue;
                 }
             } else {
                 consecutiveBlankLines = 0;
             }
 
-            // Aplicar propagación de constantes a la línea
-            String optimizedLine = applyConstantPropagation(line);
+            // CRÍTICO: Actualizar variables disponibles ANTES de optimizar la línea
+            Matcher declMatcher = VAL_VAR_PATTERN.matcher(line);
+            if (declMatcher.find()) {
+                String varName = declMatcher.group(2);
+                variablesAvailableAtLine.add(varName);
+            }
 
+            String optimizedLine = applyConstantPropagation(line);
             optimized.append(optimizedLine).append("\n");
         }
 
@@ -223,77 +201,48 @@ public class SourceOptimizer {
     private String applyConstantPropagation(String line) {
         String optimizedLine = line;
 
-        // NO aplicar propagación en líneas de declaración/asignación de variables
-        // Solo en líneas donde se USAN las variables (como print, expresiones, etc.)
-        // Detectar si es una línea de declaración (val/var X: Type = ...)
+        // Detectar declaraciones
         Matcher declMatcher = VAL_VAR_PATTERN.matcher(line);
         if (declMatcher.find()) {
-            String varName = declMatcher.group(2); // Nombre de la variable que se está declarando
-            String value = declMatcher.group(4).trim(); // El valor asignado
-
-            // Solo propagar constantes en el LADO DERECHO de la asignación (el valor)
-            // Pero NO reemplazar la variable que se está declarando (lado izquierdo)
-            // Ordenar por longitud descendente para evitar reemplazos parciales
-            List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(constantPropagation.entrySet());
-            sortedEntries.sort((a, b) -> b.getKey().length() - a.getKey().length());
-
-            String optimizedValue = value;
-            for (Map.Entry<String, String> entry : sortedEntries) {
-                String propagateVarName = entry.getKey();
-                String constValue = entry.getValue();
-
-                // NO reemplazar la variable que se está declarando en esta línea
-                if (propagateVarName.equals(varName)) {
-                    continue;
-                }
-
-                // Reemplazar otras variables en el valor asignado
-                Pattern varPattern = Pattern.compile("\\b" + Pattern.quote(propagateVarName) + "\\b");
-                optimizedValue = varPattern.matcher(optimizedValue).replaceAll(constValue);
-            }
-
-            // Reconstruir la línea con el valor optimizado
             String type = declMatcher.group(1);
+            String varName = declMatcher.group(2);
             String dataType = declMatcher.group(3);
+            String value = declMatcher.group(4).trim();
 
-            // Preservar indentación original
+            // OPTIMIZACIÓN MEJORADA: Solo propagar constantes disponibles
+            String optimizedValue = propagateInExpression(value, varName);
+
             String indentation = line.substring(0, line.indexOf(type));
             optimizedLine = String.format("%s%s %s: %s = %s", indentation, type, varName, dataType, optimizedValue);
-
             return optimizedLine;
         }
 
-        // Detectar si es una línea de asignación simple (X = ...)
+        // Detectar asignaciones
         Matcher assignMatcher = ASSIGNMENT_PATTERN.matcher(line);
         if (assignMatcher.find()) {
-            String varName = assignMatcher.group(1); // Variable que recibe la asignación
-            String value = assignMatcher.group(2).trim(); // Valor asignado
+            String varName = assignMatcher.group(1);
+            String value = assignMatcher.group(2).trim();
 
-            List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(constantPropagation.entrySet());
-            sortedEntries.sort((a, b) -> b.getKey().length() - a.getKey().length());
+            String optimizedValue = propagateInExpression(value, varName);
 
-            String optimizedValue = value;
-            for (Map.Entry<String, String> entry : sortedEntries) {
-                String propagateVarName = entry.getKey();
-                String constValue = entry.getValue();
-
-                // NO reemplazar la variable que se está asignando
-                if (propagateVarName.equals(varName)) {
-                    continue;
-                }
-
-                Pattern varPattern = Pattern.compile("\\b" + Pattern.quote(propagateVarName) + "\\b");
-                optimizedValue = varPattern.matcher(optimizedValue).replaceAll(constValue);
-            }
-
-            // Preservar indentación
             String indentation = line.substring(0, line.indexOf(varName));
             optimizedLine = String.format("%s%s = %s", indentation, varName, optimizedValue);
-
             return optimizedLine;
         }
 
-        // Para otras líneas (print, expresiones, etc.), aplicar propagación normal
+        // Para otras líneas (print, etc.)
+        optimizedLine = propagateInExpression(line, null);
+        return optimizedLine;
+    }
+
+    /**
+     * NUEVO MÉTODO: Propaga constantes solo si la variable está disponible
+     * y no es la variable que se está declarando.
+     */
+    private String propagateInExpression(String expression, String declaringVar) {
+        String result = expression;
+
+        // Ordenar por longitud descendente para evitar reemplazos parciales
         List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(constantPropagation.entrySet());
         sortedEntries.sort((a, b) -> b.getKey().length() - a.getKey().length());
 
@@ -301,20 +250,29 @@ public class SourceOptimizer {
             String varName = entry.getKey();
             String constValue = entry.getValue();
 
-            // Usar regex con word boundaries para reemplazos precisos
-            Pattern varPattern = Pattern.compile("\\b" + Pattern.quote(varName) + "\\b");
+            // NO reemplazar la variable que se está declarando
+            if (varName.equals(declaringVar)) {
+                continue;
+            }
 
-            // Solo reemplazar si NO está dentro de una string literal
-            if (!isInsideStringLiteral(optimizedLine, varName)) {
-                optimizedLine = varPattern.matcher(optimizedLine).replaceAll(constValue);
+            // CRÍTICO: Solo propagar si la variable ya fue declarada
+            // (está en variablesAvailableAtLine) o si no es una declaración
+            if (declaringVar != null && !variablesAvailableAtLine.contains(varName)) {
+                // Esta variable aún no está disponible, no propagar
+                continue;
+            }
+
+            // Solo propagar si NO está dentro de string literal
+            if (!isInsideStringLiteral(result, varName)) {
+                Pattern varPattern = Pattern.compile("\\b" + Pattern.quote(varName) + "\\b");
+                result = varPattern.matcher(result).replaceAll(constValue);
             }
         }
 
-        return optimizedLine;
+        return result;
     }
 
     private boolean isInsideStringLiteral(String line, String target) {
-        // Detectar si el target está dentro de comillas
         int index = line.indexOf(target);
         if (index == -1) {
             return false;
@@ -327,7 +285,6 @@ public class SourceOptimizer {
             }
         }
 
-        // Si hay un número impar de comillas antes, está dentro de un string
         return quotesBefore % 2 != 0;
     }
 
