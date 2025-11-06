@@ -15,8 +15,8 @@ import java.util.regex.Pattern;
 import java.util.HashSet;
 import java.util.Set;
 
-
 public class SimpleCalcGUI extends JFrame {
+
     private JTextArea inputArea;
     private JTextArea outputArea;
     private JLabel statusLabel;
@@ -27,10 +27,14 @@ public class SimpleCalcGUI extends JFrame {
     private int lastUniqueTempVars;
     private long lastCompilationDurationMs;
 
+    // Campos para optimización de código fuente
+    private int originalSourceLines;
+    private int optimizedSourceLines;
+    private String lastOptimizedCode;
 
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1200, 700); 
+        setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -53,55 +57,55 @@ public class SimpleCalcGUI extends JFrame {
         inputScrollPane.setRowHeaderView(lineNumbers);
 
         // Código de ejemplo para pruebas de optimización
-        inputArea.setText("fun main() {\n" +
-                "    val valorInicial: Int = 100\n" +
-                "    val constante1: Int = 5 + 3\n" +
-                "    var constante2: Int = (20 / 4) * 2\n" +
-                "    \n" +
-                "    print(\"Constante 1: \")\n" +
-                "    print(constante1)\n" +
-                "    print(\"\\nConstante 2: \")\n" +
-                "    print(constante2)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val a: Int = valorInicial\n" +
-                "    var b: Int = a\n" +
-                "    var c: Int = b + constante1\n" +
-                "    \n" +
-                "    print(\"Valor de c: \")\n" +
-                "    print(c)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val d: Int = 10\n" +
-                "    var e: Int = d * (constante1 - 2)\n" +
-                "    \n" +
-                "    print(\"Valor de e: \")\n" +
-                "    print(e)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    var f: Int = e\n" +
-                "    val g: Int = f / 2 + constante2\n" +
-                "    \n" +
-                "    print(\"Valor de g: \")\n" +
-                "    print(g)\n" +
-                "    print(\"\\n\")\n" +
-                "    \n" +
-                "    val h: Int = a\n" +
-                "    var i: Int = h + b\n" +
-                "    \n" +
-                "    print(\"Valor de i: \")\n" +
-                "    print(i)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    val k: Int = 7\n" +
-                "    var l: Int = k * (a + 3) - (b / c)\n" +
-                "    \n" +
-                "    print(\"Valor de l: \")\n" +
-                "    print(l)\n" +
-                "    print(\"\\n\")\n" +
-                "\n" +
-                "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n" +
-                "}");
+        inputArea.setText("fun main() {\n"
+                + "    val valorInicial: Int = 100\n"
+                + "    val constante1: Int = 5 + 3\n"
+                + "    var constante2: Int = (20 / 4) * 2\n"
+                + "    \n"
+                + "    print(\"Constante 1: \")\n"
+                + "    print(constante1)\n"
+                + "    print(\"\\nConstante 2: \")\n"
+                + "    print(constante2)\n"
+                + "    print(\"\\n\")\n"
+                + "\n"
+                + "    val a: Int = valorInicial\n"
+                + "    var b: Int = a\n"
+                + "    var c: Int = b + constante1\n"
+                + "    \n"
+                + "    print(\"Valor de c: \")\n"
+                + "    print(c)\n"
+                + "    print(\"\\n\")\n"
+                + "\n"
+                + "    val d: Int = 10\n"
+                + "    var e: Int = d * (constante1 - 2)\n"
+                + "    \n"
+                + "    print(\"Valor de e: \")\n"
+                + "    print(e)\n"
+                + "    print(\"\\n\")\n"
+                + "\n"
+                + "    var f: Int = e\n"
+                + "    val g: Int = f / 2 + constante2\n"
+                + "    \n"
+                + "    print(\"Valor de g: \")\n"
+                + "    print(g)\n"
+                + "    print(\"\\n\")\n"
+                + "    \n"
+                + "    val h: Int = a\n"
+                + "    var i: Int = h + b\n"
+                + "    \n"
+                + "    print(\"Valor de i: \")\n"
+                + "    print(i)\n"
+                + "    print(\"\\n\")\n"
+                + "\n"
+                + "    val k: Int = 7\n"
+                + "    var l: Int = k * (a + 3) - (b / c)\n"
+                + "    \n"
+                + "    print(\"Valor de l: \")\n"
+                + "    print(l)\n"
+                + "    print(\"\\n\")\n"
+                + "\n"
+                + "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n"
+                + "}");
 
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -140,7 +144,7 @@ public class SimpleCalcGUI extends JFrame {
                 processSemanticAnalysis();
             }
         });
-        
+
         JButton generateIntermediateButton = new JButton("Generar Intermedio");
         generateIntermediateButton.addActionListener(new ActionListener() {
             @Override
@@ -158,6 +162,21 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
+        JButton optimizeSourceButton = new JButton("Optimizar Código Fuente");
+        optimizeSourceButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                optimizeSourceCode();
+            }
+        });
+
+        JButton saveOptimizedButton = new JButton("Guardar Código Optimizado");
+        saveOptimizedButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveOptimizedCode();
+            }
+        });
 
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
@@ -174,7 +193,7 @@ public class SimpleCalcGUI extends JFrame {
                 clearEditorAndOutput();
             }
         });
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
@@ -184,6 +203,8 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(showMetricsButton); // Añadir el nuevo botón
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
+        buttonPanel.add(optimizeSourceButton);
+        buttonPanel.add(saveOptimizedButton);
 
         statusLabel = new JLabel("Listo.");
 
@@ -213,17 +234,17 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
-        List<String> allParserErrors = parser.getErrors(); 
+        parser.parse();
+        List<String> allParserErrors = parser.getErrors();
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -266,7 +287,7 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Tokens Reconocidos ---\n");
         sb.append(Token.getTableHeader()).append("\n");
@@ -278,10 +299,10 @@ public class SimpleCalcGUI extends JFrame {
         sb.append(Token.getTableFooter()).append("\n\n");
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -313,20 +334,20 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
-                                              .filter(err -> !err.contains("Error semántico")) 
-                                              .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -336,7 +357,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -371,23 +392,23 @@ public class SimpleCalcGUI extends JFrame {
         List<Token> tokens = lexer.scanTokens();
 
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
-        List<String> allParserErrors = parser.getErrors(); 
+        List<String> allParserErrors = parser.getErrors();
         List<String> semanticErrors = allParserErrors.stream()
-                                               .filter(err -> err.contains("Error semántico"))
-                                               .collect(Collectors.toList());
+                .filter(err -> err.contains("Error semántico"))
+                .collect(Collectors.toList());
         List<String> syntaxErrors = allParserErrors.stream()
-                                                .filter(err -> !err.contains("Error semántico"))
-                                                .collect(Collectors.toList());
+                .filter(err -> !err.contains("Error semántico"))
+                .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -397,7 +418,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -429,7 +450,7 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
     }
-    
+
     // --- MODIFICADO: generateIntermediateCode para almacenar métricas ---
     private void generateIntermediateCode() {
         outputArea.setText("");
@@ -440,13 +461,13 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
-                                           .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
-                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
-                                           .collect(Collectors.toList());
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                .collect(Collectors.toList());
 
         // --- Inicia medición de tiempo ---
         long startTime = System.nanoTime();
@@ -481,8 +502,8 @@ public class SimpleCalcGUI extends JFrame {
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
             int currentTotalQuadruples = 0;
-            Set<String> currentUniqueTempVars = new HashSet<>(); 
-            
+            Set<String> currentUniqueTempVars = new HashSet<>();
+
             if (expressions.isEmpty()) {
                 sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
@@ -491,7 +512,7 @@ public class SimpleCalcGUI extends JFrame {
                     sb.append("Expresión #").append(i + 1).append(" ");
                     sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
-                    
+
                     currentTotalQuadruples += data.quadruples.size();
                     // Contar temporales únicas
                     Pattern p = Pattern.compile("t\\d+");
@@ -503,7 +524,7 @@ public class SimpleCalcGUI extends JFrame {
                     }
                 }
             }
-            
+
             // Almacenar métricas para el botón "Mostrar Métricas"
             lastTotalQuadruples = currentTotalQuadruples;
             lastUniqueTempVars = currentUniqueTempVars.size();
@@ -521,7 +542,7 @@ public class SimpleCalcGUI extends JFrame {
     private void displayMetrics() {
         outputArea.setText(""); // Limpiar la salida anterior
         inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
         sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
@@ -535,7 +556,6 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLUE); // Un color distinto para métricas
     }
 
-
     private void highlightErrorFromMessage(String errorMessage) {
         try {
             if (errorMessage.startsWith("[")) {
@@ -543,10 +563,10 @@ public class SimpleCalcGUI extends JFrame {
                 String[] parts = locationPart.split(",");
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                
+
                 String lexemeToHighlight = "";
                 int lexemeLength = 1;
-                
+
                 int startLexicalError = errorMessage.indexOf("Error Léxico: '");
                 if (startLexicalError != -1) {
                     startLexicalError += "Error Léxico: '".length();
@@ -558,17 +578,17 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
                 if (startSyntaxSemanticError != -1) {
-                     startSyntaxSemanticError += "Error en '".length();
-                     int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
-                     if (endSyntaxSemanticError != -1) {
-                         lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
-                         lexemeLength = lexemeToHighlight.length();
-                         highlightError(line, col, lexemeLength);
-                         return;
-                     }
+                    startSyntaxSemanticError += "Error en '".length();
+                    int endSyntaxSemanticError = errorMessage.indexOf("'", startSyntaxSemanticError);
+                    if (endSyntaxSemanticError != -1) {
+                        lexemeToHighlight = errorMessage.substring(startSyntaxSemanticError, endSyntaxSemanticError);
+                        lexemeLength = lexemeToHighlight.length();
+                        highlightError(line, col, lexemeLength);
+                        return;
+                    }
                 }
                 int startSemanticErrorNear = errorMessage.indexOf("Error semántico cerca de '");
                 if (startSemanticErrorNear != -1) {
@@ -581,7 +601,7 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 highlightError(line, col, 1);
 
             }
@@ -601,16 +621,16 @@ public class SimpleCalcGUI extends JFrame {
 
             int startOffset = inputArea.getLineStartOffset(docLine) + docCol;
             int endOffset = startOffset + length;
-            
-            if (startOffset < inputArea.getDocument().getLength()) {
-                 endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
-                 endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
 
-                 if(startOffset < endOffset){
-                     inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
-                 } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()){
-                     inputArea.getHighlighter().addHighlight(startOffset, startOffset +1, errorPainter);
-                 }
+            if (startOffset < inputArea.getDocument().getLength()) {
+                endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
+                endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
+
+                if (startOffset < endOffset) {
+                    inputArea.getHighlighter().addHighlight(startOffset, endOffset, errorPainter);
+                } else if (startOffset == endOffset && startOffset < inputArea.getDocument().getLength()) {
+                    inputArea.getHighlighter().addHighlight(startOffset, startOffset + 1, errorPainter);
+                }
             }
 
         } catch (BadLocationException ex) {
@@ -652,5 +672,184 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLACK);
     }
 
+    private void optimizeSourceCode() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Optimizando código fuente...");
+        statusLabel.setForeground(Color.BLACK);
 
+        String sourceCode = inputArea.getText();
+
+        // PASO 1: Validar que el código no tenga errores
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+
+        List<String> lexicalErrors = tokens.stream()
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s",
+                t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme))
+                .collect(Collectors.toList());
+
+        Parser parser = new Parser(tokens);
+        parser.parse();
+        List<String> allParserErrors = parser.getErrors();
+
+        StringBuilder sb = new StringBuilder();
+
+        if (!lexicalErrors.isEmpty() || !allParserErrors.isEmpty()) {
+            sb.append(">>> ERROR: No se puede optimizar código con errores <<<\n\n");
+            sb.append("Por favor, corrija primero los errores léxicos, sintácticos y semánticos.\n\n");
+
+            if (!lexicalErrors.isEmpty()) {
+                sb.append("--- Errores Léxicos ---\n");
+                for (String err : lexicalErrors) {
+                    sb.append(err).append("\n");
+                }
+                sb.append("\n");
+            }
+
+            if (!allParserErrors.isEmpty()) {
+                sb.append("--- Errores Sintácticos/Semánticos ---\n");
+                for (String err : allParserErrors) {
+                    sb.append(err).append("\n");
+                }
+            }
+
+            outputArea.setText(sb.toString());
+            statusLabel.setText("Optimización FALLIDA: Código con errores");
+            statusLabel.setForeground(Color.RED);
+            return;
+        }
+
+        // PASO 2: Ejecutar optimización
+        SourceOptimizer optimizer = new SourceOptimizer(sourceCode);
+        OptimizationResult result = optimizer.optimize();
+
+        if (result.hasErrors()) {
+            sb.append(">>> ERROR durante la optimización <<<\n\n");
+            sb.append(result.getErrorMessage()).append("\n");
+            outputArea.setText(sb.toString());
+            statusLabel.setText("Optimización FALLIDA");
+            statusLabel.setForeground(Color.RED);
+            return;
+        }
+
+        // PASO 3: Validar código optimizado
+        Lexer optimizedLexer = new Lexer(result.getOptimizedSource());
+        List<Token> optimizedTokens = optimizedLexer.scanTokens();
+
+        List<String> optimizedLexicalErrors = optimizedTokens.stream()
+                .filter(t -> t.type == Token.TokenType.ERROR)
+                .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s",
+                t.line, t.column,
+                t.errorMessage != null ? t.errorMessage : t.lexeme))
+                .collect(Collectors.toList());
+
+        Parser optimizedParser = new Parser(optimizedTokens);
+        optimizedParser.parse();
+        List<String> optimizedParserErrors = optimizedParser.getErrors();
+
+        if (!optimizedLexicalErrors.isEmpty() || !optimizedParserErrors.isEmpty()) {
+            sb.append(">>> ADVERTENCIA: El código optimizado contiene errores <<<\n\n");
+            sb.append("Esto indica un problema en el optimizador. No se guardará el resultado.\n\n");
+
+            // Mostrar los errores encontrados para debugging
+            if (!optimizedLexicalErrors.isEmpty()) {
+                sb.append("--- Errores Léxicos en Código Optimizado ---\n");
+                for (String err : optimizedLexicalErrors) {
+                    sb.append(err).append("\n");
+                }
+                sb.append("\n");
+            }
+
+            if (!optimizedParserErrors.isEmpty()) {
+                sb.append("--- Errores Sintácticos/Semánticos en Código Optimizado ---\n");
+                for (String err : optimizedParserErrors) {
+                    sb.append(err).append("\n");
+                }
+            }
+
+            outputArea.setText(sb.toString());
+            statusLabel.setText("Optimización generó errores");
+            statusLabel.setForeground(Color.ORANGE);
+            return;
+        }
+
+        // PASO 4: Mostrar resultados
+        lastOptimizedCode = result.getOptimizedSource();
+        originalSourceLines = result.getOriginalLines();
+        optimizedSourceLines = result.getOptimizedLines();
+
+        sb.append(result.getSummary()).append("\n");
+        sb.append("=== CÓDIGO OPTIMIZADO ===\n\n");
+        sb.append(result.getOptimizedSource());
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+        statusLabel.setText("Optimización EXITOSA - Use 'Guardar Código Optimizado' para exportar");
+        statusLabel.setForeground(new Color(0, 128, 0));
+    }
+
+    private void saveOptimizedCode() {
+        if (lastOptimizedCode == null || lastOptimizedCode.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No hay código optimizado para guardar.\nPrimero use 'Optimizar Código Fuente'.",
+                    "Sin código optimizado",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setCurrentDirectory(new java.io.File("."));
+        fileChooser.setDialogTitle("Guardar Código Optimizado");
+        fileChooser.setSelectedFile(new java.io.File("codigo_optimizado.txt"));
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Archivos de texto (*.txt)", "txt"));
+
+        int result = fileChooser.showSaveDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+
+            // Asegurar extensión .txt
+            String filePath = selectedFile.getAbsolutePath();
+            if (!filePath.toLowerCase().endsWith(".txt")) {
+                selectedFile = new java.io.File(filePath + ".txt");
+            }
+
+            try {
+                java.nio.file.Files.write(selectedFile.toPath(), lastOptimizedCode.getBytes());
+
+                String message = String.format(
+                        "Código optimizado guardado exitosamente en:\n%s\n\n"
+                        + "Líneas originales: %d\n"
+                        + "Líneas optimizadas: %d\n"
+                        + "Reducción: %d líneas (%.1f%%)",
+                        selectedFile.getAbsolutePath(),
+                        originalSourceLines,
+                        optimizedSourceLines,
+                        (originalSourceLines - optimizedSourceLines),
+                        ((originalSourceLines - optimizedSourceLines) * 100.0 / originalSourceLines)
+                );
+
+                JOptionPane.showMessageDialog(this, message,
+                        "Guardado Exitoso", JOptionPane.INFORMATION_MESSAGE);
+
+                statusLabel.setText("Código optimizado guardado: " + selectedFile.getName());
+                statusLabel.setForeground(new Color(0, 100, 0));
+
+            } catch (java.io.IOException ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Error al guardar el archivo:\n" + ex.getMessage(),
+                        "Error de Escritura",
+                        JOptionPane.ERROR_MESSAGE);
+
+                statusLabel.setText("Error al guardar código optimizado");
+                statusLabel.setForeground(Color.RED);
+                System.err.println("Error al guardar código optimizado: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        }
+    }
 }

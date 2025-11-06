@@ -1268,4 +1268,29 @@ public class Parser {
 
         collectedExpressions.add(data);
     }
+    
+    // --- MÉTODOS PARA SOPORTE DE OPTIMIZACIÓN DE CÓDIGO FUENTE ---
+    
+    /**
+     * Retorna un mapa con información de las variables declaradas.
+     * Útil para el optimizador de código fuente.
+     */
+    public Map<String, String> getVariableTypes() {
+        return new HashMap<>(variableTypes);
+    }
+    
+    /**
+     * Retorna el conjunto de variables declaradas.
+     */
+    public Set<String> getDeclaredVariables() {
+        return new HashSet<>(declaredVariables);
+    }
+    
+    /**
+     * Retorna los valores numéricos de las variables (para optimización).
+     */
+    public Map<String, Integer> getVariableValues() {
+        return new HashMap<>(variableValues);
+    }
+    
 }
