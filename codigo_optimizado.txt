@@ -1,0 +1,23 @@
+fun main() {
+    val valorInicial: Int = 100
+    val constante1: Int = 8
+    var constante2: Int = 10
+    print(8)
+    print(10)
+    val a: Int = 100
+    var b: Int = 100
+    var c: Int = 108
+    print(108)
+    val d: Int = 10
+    var e: Int = 60
+    print(60)
+    var f: Int = 60
+    val g: Int = 40
+    print(40)
+    val h: Int = 100
+    var i: Int = 200
+    print(200)
+    val k: Int = 7
+    var l: Int = 721
+    print(721)
+}

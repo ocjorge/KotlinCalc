@@ -585,18 +585,18 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLUE);
     }
 
-    // --- NUEVO MÉTODO: Mostrar Código Kotlin Optimizado ---
+    // --- NUEVO MÉTODO: Mostrar Código SimpleCalc Optimizado ---
     private void showOptimizedKotlinCode() {
         outputArea.setText("");
         inputArea.getHighlighter().removeAllHighlights();
-        statusLabel.setText("Generando código Kotlin optimizado...");
+        statusLabel.setText("Generando código SimpleCalc optimizado...");
         statusLabel.setForeground(Color.BLACK);
 
         // Se requiere que el paso de "Generar Intermedio (Optimizado)" se haya ejecutado exitosamente
         // para que 'lastSuccessfulParser' contenga una instancia válida y sin errores.
         if (lastSuccessfulParser == null || !lastSuccessfulParser.getErrors().isEmpty()) {
-            outputArea.setText("No se pudo generar código Kotlin optimizado. Asegúrese de que el análisis de Código Intermedio (Optimizado) haya sido exitoso (sin errores léxicos, sintácticos o semánticos).\n");
-            statusLabel.setText("Generación de Código Kotlin Optimizado FALLIDA (errores o no se compiló).");
+            outputArea.setText("No se pudo generar código SimpleCalc optimizado. Asegúrese de que el análisis de Código Intermedio (Optimizado) haya sido exitoso (sin errores léxicos, sintácticos o semánticos).\n");
+            statusLabel.setText("Generación de Código SimpleCalc Optimizado FALLIDA (errores o no se compiló).");
             statusLabel.setForeground(Color.RED);
             return;
         }
@@ -609,15 +609,24 @@ public class SimpleCalcGUI extends JFrame {
             );
             String optimizedKotlinCode = codeGenerator.generateOptimizedKotlinCode();
 
-            outputArea.setText("--- Código Kotlin Optimizado ---\n\n");
+            outputArea.setText("--- Código SimpleCalc Optimizado ---\n\n");
             outputArea.append(optimizedKotlinCode);
-            outputArea.append("\n--- Fin del Código Kotlin Optimizado ---\n");
-            statusLabel.setText("Código Kotlin optimizado generado y mostrado.");
+            outputArea.append("\n--- Fin del Código SimpleCalc Optimizado ---\n");
+            statusLabel.setText("Código SimpleCalc optimizado generado y mostrado.");
             statusLabel.setForeground(Color.BLUE);
+            
+            //Guardar automáticamente en un archivo .txt
+            java.nio.file.Path outputPath = java.nio.file.Paths.get("codigo_optimizado.txt");
+            java.nio.file.Files.write(outputPath, optimizedKotlinCode.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+            statusLabel.setText("Código Kotlin optimizado generado y guardado en 'codigo_optimizado.txt'.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+
+
 
         } catch (Exception ex) {
-            outputArea.setText("Error al generar el código Kotlin optimizado: " + ex.getMessage() + "\n");
-            statusLabel.setText("Generación de Código Kotlin Optimizado FALLIDA.");
+            outputArea.setText("Error al generar el código SimpleCalc optimizado: " + ex.getMessage() + "\n");
+            statusLabel.setText("Generación de Código SimpleCalc Optimizado FALLIDA.");
             statusLabel.setForeground(Color.RED);
             ex.printStackTrace();
         }
