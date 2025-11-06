@@ -175,17 +175,10 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // NUEVO BOTÓN: Mostrar Código Kotlin Optimizado
-        JButton showOptimizedKotlinCodeButton = new JButton("Código Optimizado");
-        showOptimizedKotlinCodeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showOptimizedKotlinCode();
-            }
-        });
+        
 
         // Botones para el LegacyParser (NO OPTIMIZADO)
-        JButton generateLegacyIntermediateButton = new JButton("Intermedio Legacy");
+        JButton generateLegacyIntermediateButton = new JButton("Intermedio Sin Optimizar");
         generateLegacyIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -193,11 +186,20 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton showLegacyMetricsButton = new JButton("Métricas LEgacy");
+        JButton showLegacyMetricsButton = new JButton("Métricas Sin Optimizar");
         showLegacyMetricsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 displayLegacyMetrics();
+            }
+        });
+        
+        // NUEVO BOTÓN: Mostrar Código Kotlin Optimizado
+        JButton showOptimizedKotlinCodeButton = new JButton("Código Optimizado");
+        showOptimizedKotlinCodeButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showOptimizedKotlinCode();
             }
         });
 
@@ -226,9 +228,9 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(semanticButton);
         buttonPanel.add(generateOptimizedIntermediateButton);
         buttonPanel.add(showOptimizedMetricsButton);
-        buttonPanel.add(showOptimizedKotlinCodeButton);
         buttonPanel.add(generateLegacyIntermediateButton);
         buttonPanel.add(showLegacyMetricsButton);
+        buttonPanel.add(showOptimizedKotlinCodeButton);
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
