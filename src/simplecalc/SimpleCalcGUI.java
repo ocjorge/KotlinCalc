@@ -18,7 +18,7 @@ import java.util.Set;
 
 public class SimpleCalcGUI extends JFrame {
     private JTextArea inputArea;
-    private JTextArea outputArea;
+    private JTextArea outputArea; // Declara aquí para que sea accesible
     private JLabel statusLabel;
     private Highlighter.HighlightPainter errorPainter;
 
@@ -57,8 +57,8 @@ public class SimpleCalcGUI extends JFrame {
         JScrollPane inputScrollPane = new JScrollPane(inputArea);
         inputScrollPane.setBorder(BorderFactory.createTitledBorder("Código Kotlin"));
 
-        LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
-        inputScrollPane.setRowHeaderView(lineNumbers);
+        LineNumberingTextArea lineNumbersInput = new LineNumberingTextArea(inputArea); // Renombrado para claridad
+        inputScrollPane.setRowHeaderView(lineNumbersInput);
 
         // Código de ejemplo para pruebas de optimización
         inputArea.setText("fun main() {\n" +
@@ -114,8 +114,17 @@ public class SimpleCalcGUI extends JFrame {
         outputArea = new JTextArea();
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         outputArea.setEditable(false);
+        outputArea.setLineWrap(true); // Habilitar ajuste de línea
+        outputArea.setWrapStyleWord(true); // Ajuste de palabra para que no rompa palabras
+        outputArea.setRows(100);   
         JScrollPane outputScrollPane = new JScrollPane(outputArea);
+        
         outputScrollPane.setBorder(BorderFactory.createTitledBorder("Salida del Compilador"));
+        
+        // AÑADIR NÚMEROS DE LÍNEA AL ÁREA DE SALIDA
+        LineNumberingTextArea lineNumbersOutput = new LineNumberingTextArea(outputArea);
+        outputScrollPane.setRowHeaderView(lineNumbersOutput);
+
 
         JButton processButton = new JButton("Compilar");
         processButton.addActionListener(new ActionListener() {
@@ -175,7 +184,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // Botones para el LegacyParser (NO OPTIMIZADO) - RESTAURADOS
+        // Botones para el LegacyParser (NO OPTIMIZADO)
         JButton generateLegacyIntermediateButton = new JButton("Intermedio Legacy");
         generateLegacyIntermediateButton.addActionListener(new ActionListener() {
             @Override
@@ -184,7 +193,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton showLegacyMetricsButton = new JButton("Métricas Legacy");
+        JButton showLegacyMetricsButton = new JButton("Métricas LEgacy");
         showLegacyMetricsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -193,7 +202,7 @@ public class SimpleCalcGUI extends JFrame {
         });
 
 
-        JButton loadFileButton = new JButton("Cargar Archivo"); // RESTAURADO
+        JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -209,7 +218,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // Panel de botones con todos los botones restaurados y el nuevo añadido
+        // Panel de botones con todos los botones
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
@@ -217,10 +226,10 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(semanticButton);
         buttonPanel.add(generateOptimizedIntermediateButton);
         buttonPanel.add(showOptimizedMetricsButton);
-        buttonPanel.add(showOptimizedKotlinCodeButton); // Botón de código optimizado
+        buttonPanel.add(showOptimizedKotlinCodeButton);
         buttonPanel.add(generateLegacyIntermediateButton);
         buttonPanel.add(showLegacyMetricsButton);
-        buttonPanel.add(loadFileButton); // Botón de cargar archivo restaurado
+        buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
         statusLabel = new JLabel("Listo.");
