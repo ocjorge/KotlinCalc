@@ -18,14 +18,16 @@ public class Parser {
     private int current = 0;
     private List<String> errors = new ArrayList<>();
     private Set<String> declaredVariables = new HashSet<>();
-    private Map<String, String> variableTypes = new HashMap<>();
+    public Map<String, String> variableTypes = new HashMap<>(); // Hecho publico para acceso desde KotlinCodeGenerator
     private Map<String, Integer> variableValues = new HashMap<>(); // Valores numéricos persistentes de las variables
+    private Map<String, Boolean> variableIsVar = new HashMap<>(); // true si es var, false si es val
 
     private List<ExpressionData> collectedExpressions = new ArrayList<>();
 
     // **Optimización: Precompilación del patrón regex para la propagación de copias.**
     // Este patrón se usa repetidamente en getPropagatedValue para identificar asignaciones.
-    private static final Pattern QUAD_ASSIGNMENT_PATTERN = Pattern.compile("(t\\d+) = (.+)");
+    // CORRECCIÓN: Este patrón debe ser más flexible para capturar IDs o tX
+    private static final Pattern QUAD_ASSIGNMENT_PROPAGATION_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_]*|t\\d+) = (.+)");
     // Patrón para identificar el destino y los argumentos de un cuádruplo para el análisis de usos.
     // Usado para identificar operandos que son temporales en los cuádruplos finales.
     private static final Pattern QUAD_OPERAND_IDENTIFIER_PATTERN = Pattern.compile("(t\\d+|[a-zA-Z_][a-zA-Z0-9_]*)"); // Para encontrar tX o IDs
@@ -111,6 +113,7 @@ public class Parser {
         declaredVariables.clear();
         variableTypes.clear();
         variableValues.clear();
+        variableIsVar.clear(); // Limpiar también este mapa
         collectedExpressions.clear();
 
         try {
@@ -124,6 +127,17 @@ public class Parser {
     public List<Token> getTokens() {
         return tokens;
     }
+
+    // Nuevo getter para variableIsVar
+    public Map<String, Boolean> getVariableIsVar() {
+        return variableIsVar;
+    }
+
+    // Nuevo getter para variableTypes (ya que se hizo public, esto es para consistencia, o podrías hacer variableTypes privado y usar solo el getter)
+    public Map<String, String> getVariableTypes() {
+        return variableTypes;
+    }
+
 
     private void programa() {
         consume(FUN_KEYWORD, "Se esperaba 'fun' al inicio del programa.");
@@ -213,7 +227,7 @@ public class Parser {
     }
 
     private void declaracion_stmt() {
-        Token declarationType = advance();
+        Token declarationType = advance(); // VAL_KEYWORD o VAR_KEYWORD
         Token varNameToken = consume(ID, "Se esperaba un nombre de variable después de '" + declarationType.lexeme + "'.");
 
         if (declaredVariables.contains(varNameToken.lexeme)) {
@@ -241,6 +255,7 @@ public class Parser {
 
         declaredVariables.add(varNameToken.lexeme);
         variableTypes.put(varNameToken.lexeme, declaredType);
+        variableIsVar.put(varNameToken.lexeme, declarationType.type == VAR_KEYWORD); // ¡NUEVA LÍNEA!
         System.out.println("DEBUG declaracion_stmt: Declarando variable: " + varNameToken.lexeme + " de tipo: " + declaredType);
 
         // Solo recolectar si es una expresión aritmética válida (tiene operadores o es un ID/NUMERO)
@@ -376,6 +391,7 @@ public class Parser {
         }
         declaredVariables.add(loopVarName.lexeme);
         variableTypes.put(loopVarName.lexeme, "Int");
+        variableIsVar.put(loopVarName.lexeme, true); // Las variables de bucle for son implícitamente 'var'
         System.out.println("DEBUG for_stmt: Declarando variable de bucle: " + loopVarName.lexeme + " de tipo: Int");
 
 
@@ -1105,27 +1121,29 @@ public class Parser {
         // Solo incluimos cuádruplos intermedios si su temporal de destino es usada en los cuádruplos finales.
         List<String> trulyOptimizedQuadruples = new ArrayList<>();
         for (String quad : intermediateQuadruples) {
-            Matcher assignMatcher = QUAD_ASSIGNMENT_PATTERN.matcher(quad);
+            // CORRECCIÓN: Usar el nuevo patrón más flexible para DCE también
+            Matcher assignMatcher = QUAD_ASSIGNMENT_PROPAGATION_PATTERN.matcher(quad);
             if (assignMatcher.find()) {
-                String definedTemp = assignMatcher.group(1).trim(); // Captura "tX"
-                // Si la temporal `definedTemp` se define aquí Y es usada en los cuádruplos finales, la mantenemos.
-                if (temporariesUsedAsOperands.contains(definedTemp)) {
+                String definedTarget = assignMatcher.group(1).trim(); // Captura "tX" o "ID"
+                // Si el objetivo es un temporal Y es usado, lo mantenemos.
+                // Si el objetivo es una variable real (no temporal), SIEMPRE la mantenemos.
+                if (definedTarget.startsWith("t")) {
+                    if (temporariesUsedAsOperands.contains(definedTarget)) {
+                        trulyOptimizedQuadruples.add(quad);
+                    }
+                } else { // Es una variable real (no temporal)
                     trulyOptimizedQuadruples.add(quad);
                 }
             } else {
-                // Cuádruplos que no son asignaciones directas a temporales (ej. PRINT) o no tienen un patrón claro,
-                // por simplicidad y robustez, los mantenemos si no están ya en finalCommittedQuadruples.
-                // Sin embargo, para este nivel de analizador, todos los intermedios son asignaciones a tX.
-                // Si hubiera otros tipos (saltos, etc.), se necesitaría un manejo más detallado.
-                // Para el caso de cuádruplos aritméticos, `tX = arg1 op arg2`, si `tX` no es usado, se elimina.
-                // Si no es una asignación a `tX`, no debería estar en `intermediateQuadruples` con la lógica actual.
+                // Cuádruplos que no son asignaciones directas, como PRINT. Los mantenemos.
+                trulyOptimizedQuadruples.add(quad);
             }
         }
         
         // Finalmente, añadir los `finalCommittedQuadruples` a la lista.
         // Esto asegura que la asignación final o el PRINT siempre estén presentes.
         for(String quad : finalCommittedQuadruples) {
-            // Evitar duplicados si por alguna razón un cuádruplo final ya fue añadido como intermedio (ej. tX = Y y luego Z = tX, si Z=Y)
+            // Evitar duplicados si por alguna razón un cuádruplo final ya fue añadido como intermedio
             if (!trulyOptimizedQuadruples.contains(quad)) {
                 trulyOptimizedQuadruples.add(quad);
             }
@@ -1152,7 +1170,8 @@ public class Parser {
             changed = false;
             for (int i = intermediateQuadruples.size() - 1; i >= 0; i--) { // Recorrer inversamente para la definición más reciente
                 String quad = intermediateQuadruples.get(i);
-                Matcher m = QUAD_ASSIGNMENT_PATTERN.matcher(quad);
+                // CORRECCIÓN: Usar el patrón más flexible para propagación
+                Matcher m = QUAD_ASSIGNMENT_PROPAGATION_PATTERN.matcher(quad);
                 if (m.find()) {
                     String resultVar = m.group(1).trim();
                     String sourceVal = m.group(2).trim();

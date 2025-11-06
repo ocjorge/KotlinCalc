@@ -27,10 +27,13 @@ public class SimpleCalcGUI extends JFrame {
     private int lastOptimizedUniqueTempVars;
     private long lastOptimizedCompilationDurationMs;
 
-    // NUEVOS CAMPOS para almacenar métricas del LegacyParser (NO OPTIMIZADO)
+    // Campos para almacenar métricas del LegacyParser (NO OPTIMIZADO)
     private int lastLegacyTotalQuadruples;
     private int lastLegacyUniqueTempVars;
     private long lastLegacyCompilationDurationMs;
+
+    // Campo para almacenar la instancia del parser si el análisis optimizado fue exitoso
+    private Parser lastSuccessfulParser;
 
 
     public SimpleCalcGUI() {
@@ -114,7 +117,7 @@ public class SimpleCalcGUI extends JFrame {
         JScrollPane outputScrollPane = new JScrollPane(outputArea);
         outputScrollPane.setBorder(BorderFactory.createTitledBorder("Salida del Compilador"));
 
-        JButton processButton = new JButton("Compilar Completo");
+        JButton processButton = new JButton("Compilar");
         processButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -122,7 +125,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton lexicalButton = new JButton("Análisis Léxico");
+        JButton lexicalButton = new JButton("Léxico");
         lexicalButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -130,7 +133,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton syntaxButton = new JButton("Análisis Sintáctico");
+        JButton syntaxButton = new JButton("Sintáctico");
         syntaxButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -138,7 +141,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton semanticButton = new JButton("Análisis Semántico");
+        JButton semanticButton = new JButton("Semántico");
         semanticButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -147,7 +150,7 @@ public class SimpleCalcGUI extends JFrame {
         });
 
         // Botones para el Parser OPTIMIZADO
-        JButton generateOptimizedIntermediateButton = new JButton("Generar Intermedio (Optimizado)");
+        JButton generateOptimizedIntermediateButton = new JButton("Intermedio Optimizado");
         generateOptimizedIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -155,7 +158,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton showOptimizedMetricsButton = new JButton("Mostrar Métricas (Optimizado)");
+        JButton showOptimizedMetricsButton = new JButton("Métricas Optimizado");
         showOptimizedMetricsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -163,8 +166,17 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        // NUEVOS BOTONES para el LegacyParser (NO OPTIMIZADO)
-        JButton generateLegacyIntermediateButton = new JButton("Generar Intermedio (No Optimizado)");
+        // NUEVO BOTÓN: Mostrar Código Kotlin Optimizado
+        JButton showOptimizedKotlinCodeButton = new JButton("Código Optimizado");
+        showOptimizedKotlinCodeButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showOptimizedKotlinCode();
+            }
+        });
+
+        // Botones para el LegacyParser (NO OPTIMIZADO) - RESTAURADOS
+        JButton generateLegacyIntermediateButton = new JButton("Intermedio Legacy");
         generateLegacyIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -172,7 +184,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
-        JButton showLegacyMetricsButton = new JButton("Mostrar Métricas (No Optimizado)");
+        JButton showLegacyMetricsButton = new JButton("Métricas Legacy");
         showLegacyMetricsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -181,7 +193,7 @@ public class SimpleCalcGUI extends JFrame {
         });
 
 
-        JButton loadFileButton = new JButton("Cargar Archivo");
+        JButton loadFileButton = new JButton("Cargar Archivo"); // RESTAURADO
         loadFileButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -197,6 +209,7 @@ public class SimpleCalcGUI extends JFrame {
             }
         });
 
+        // Panel de botones con todos los botones restaurados y el nuevo añadido
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
@@ -204,9 +217,10 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(semanticButton);
         buttonPanel.add(generateOptimizedIntermediateButton);
         buttonPanel.add(showOptimizedMetricsButton);
-        buttonPanel.add(generateLegacyIntermediateButton); // Añadir nuevo botón
-        buttonPanel.add(showLegacyMetricsButton);       // Añadir nuevo botón
-        buttonPanel.add(loadFileButton);
+        buttonPanel.add(showOptimizedKotlinCodeButton); // Botón de código optimizado
+        buttonPanel.add(generateLegacyIntermediateButton);
+        buttonPanel.add(showLegacyMetricsButton);
+        buttonPanel.add(loadFileButton); // Botón de cargar archivo restaurado
         buttonPanel.add(clearButton);
 
         statusLabel = new JLabel("Listo.");
@@ -245,7 +259,7 @@ public class SimpleCalcGUI extends JFrame {
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
-        // Usamos el parser optimizado para la compilación completa
+        // Instancia un nuevo parser cada vez para asegurar un estado limpio
         Parser parser = new Parser(tokens);
         parser.parse();
         List<String> allParserErrors = parser.getErrors();
@@ -280,6 +294,8 @@ public class SimpleCalcGUI extends JFrame {
 
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
+        // NOTA: NO GUARDAMOS el parser aquí. lastSuccessfulParser solo se actualiza
+        // si se ejecuta "Generar Intermedio (Optimizado)" exitosamente.
     }
 
     private void processLexicalAnalysis() {
@@ -345,10 +361,9 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
-        // Usamos el parser optimizado para el análisis sintáctico
+        // Instancia un nuevo parser cada vez para asegurar un estado limpio
         Parser parser = new Parser(tokens);
         parser.parse();
-
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
                                               .filter(err -> !err.contains("Error semántico"))
@@ -404,10 +419,9 @@ public class SimpleCalcGUI extends JFrame {
 
         StringBuilder sb = new StringBuilder();
 
-        // Usamos el parser optimizado para el análisis semántico
+        // Instancia un nuevo parser cada vez para asegurar un estado limpio
         Parser parser = new Parser(tokens);
         parser.parse();
-
         List<String> allParserErrors = parser.getErrors();
         List<String> semanticErrors = allParserErrors.stream()
                                                .filter(err -> err.contains("Error semántico"))
@@ -477,7 +491,8 @@ public class SimpleCalcGUI extends JFrame {
 
         long startTime = System.nanoTime();
 
-        Parser parser = new Parser(tokens); // Usamos el Parser optimizado
+        // Siempre crear un nuevo parser para asegurar un estado limpio
+        Parser parser = new Parser(tokens);
         parser.parse();
         List<String> allParserErrors = parser.getErrors();
 
@@ -500,6 +515,7 @@ public class SimpleCalcGUI extends JFrame {
 
             lastOptimizedTotalQuadruples = 0;
             lastOptimizedUniqueTempVars = 0;
+            this.lastSuccessfulParser = null; // Reiniciar si hay errores
 
         } else {
             sb.append("--- Generación de Código Intermedio (Optimizado) ---\n\n");
@@ -534,6 +550,7 @@ public class SimpleCalcGUI extends JFrame {
             sb.append(">>> Código intermedio optimizado generado exitosamente. <<<\n");
             statusLabel.setText("Resultado: Intermedio Optimizado Generado.");
             statusLabel.setForeground(new Color(0, 128, 0));
+            this.lastSuccessfulParser = parser; // ¡Guarda la instancia del parser si es exitoso!
         }
 
         outputArea.setText(sb.toString());
@@ -557,7 +574,46 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setForeground(Color.BLUE);
     }
 
-    // --- NUEVOS Métodos para el LegacyParser (NO OPTIMIZADO) ---
+    // --- NUEVO MÉTODO: Mostrar Código Kotlin Optimizado ---
+    private void showOptimizedKotlinCode() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Generando código Kotlin optimizado...");
+        statusLabel.setForeground(Color.BLACK);
+
+        // Se requiere que el paso de "Generar Intermedio (Optimizado)" se haya ejecutado exitosamente
+        // para que 'lastSuccessfulParser' contenga una instancia válida y sin errores.
+        if (lastSuccessfulParser == null || !lastSuccessfulParser.getErrors().isEmpty()) {
+            outputArea.setText("No se pudo generar código Kotlin optimizado. Asegúrese de que el análisis de Código Intermedio (Optimizado) haya sido exitoso (sin errores léxicos, sintácticos o semánticos).\n");
+            statusLabel.setText("Generación de Código Kotlin Optimizado FALLIDA (errores o no se compiló).");
+            statusLabel.setForeground(Color.RED);
+            return;
+        }
+
+        try {
+            KotlinCodeGenerator codeGenerator = new KotlinCodeGenerator(
+                lastSuccessfulParser.getCollectedExpressions(),
+                lastSuccessfulParser.getVariableTypes(), // Usar el getter público
+                lastSuccessfulParser.getVariableIsVar()
+            );
+            String optimizedKotlinCode = codeGenerator.generateOptimizedKotlinCode();
+
+            outputArea.setText("--- Código Kotlin Optimizado ---\n\n");
+            outputArea.append(optimizedKotlinCode);
+            outputArea.append("\n--- Fin del Código Kotlin Optimizado ---\n");
+            statusLabel.setText("Código Kotlin optimizado generado y mostrado.");
+            statusLabel.setForeground(Color.BLUE);
+
+        } catch (Exception ex) {
+            outputArea.setText("Error al generar el código Kotlin optimizado: " + ex.getMessage() + "\n");
+            statusLabel.setText("Generación de Código Kotlin Optimizado FALLIDA.");
+            statusLabel.setForeground(Color.RED);
+            ex.printStackTrace();
+        }
+    }
+
+
+    // --- Métodos para el LegacyParser (NO OPTIMIZADO) ---
     private void generateLegacyIntermediateCode() {
         outputArea.setText("");
         inputArea.getHighlighter().removeAllHighlights();
@@ -577,7 +633,8 @@ public class SimpleCalcGUI extends JFrame {
 
         long startTime = System.nanoTime();
 
-        LegacyParser legacyParser = new LegacyParser(tokens); // Usamos el LegacyParser
+        // Siempre crear un nuevo legacyParser para asegurar un estado limpio
+        LegacyParser legacyParser = new LegacyParser(tokens);
         legacyParser.parse();
         List<String> allParserErrors = legacyParser.getErrors();
 
