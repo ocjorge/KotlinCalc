@@ -9,16 +9,10 @@ Salgado Rojas Marelin Iral
 Lenguajes y Automatas II
 Profa: Martínez Moreno Martha
 
-Descripción: programa que maneja etapas lexica, 
-sintactica, semantica por validación de entradas
-Transformación de expresiones aritmeticas de
-infija a prefija, uso de cuadruplos en el 
-algoritmo de traducción y conversión por partes
-Generacón de código intermedio en expresiones 
-aritmeticas, transormado de infija a prefija, 
-uso de cuadruplos, y manejo temporal de variables
-
-Branch: Prefija.
+Avance 3: se genera la optimización del código intermedio
+Simulación de resultados numéricos acumulativos para variables
+timizaciones de Constant Folding y Copy Propagation en la generación de cuádruplos
+Branch: OptimizaciónCodigo.
 
 
 */
@@ -28,7 +22,11 @@ package simplecalc;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
+
+
 public class Main {
+    
+       
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -42,5 +40,7 @@ public class Main {
                 new SimpleCalcGUI().setVisible(true);
             }
         });
+        
+       
     }
 }
