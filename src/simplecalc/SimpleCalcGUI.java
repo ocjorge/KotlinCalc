@@ -10,12 +10,23 @@ import java.awt.event.ActionListener;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.nio.file.Files;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.HashSet;
+import java.util.Set;
+
 
 public class SimpleCalcGUI extends JFrame {
     private JTextArea inputArea;
     private JTextArea outputArea;
     private JLabel statusLabel;
     private Highlighter.HighlightPainter errorPainter;
+
+    // NUEVOS CAMPOS para almacenar las últimas métricas generadas
+    private int lastTotalQuadruples;
+    private int lastUniqueTempVars;
+    private long lastCompilationDurationMs;
+
 
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
@@ -41,25 +52,55 @@ public class SimpleCalcGUI extends JFrame {
         LineNumberingTextArea lineNumbers = new LineNumberingTextArea(inputArea);
         inputScrollPane.setRowHeaderView(lineNumbers);
 
+        // Código de ejemplo para pruebas de optimización
         inputArea.setText("fun main() {\n" +
-                "    val a: Int = 10\n" +
-                "    var b: Int = a + 2 * 5\n" +
-                "    val c: Int = (b - 3) / 2\n" +
-                "    print(\"El valor de c es: \")\n" +
+                "    val valorInicial: Int = 100\n" +
+                "    val constante1: Int = 5 + 3\n" +
+                "    var constante2: Int = (20 / 4) * 2\n" +
+                "    \n" +
+                "    print(\"Constante 1: \")\n" +
+                "    print(constante1)\n" +
+                "    print(\"\\nConstante 2: \")\n" +
+                "    print(constante2)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    val a: Int = valorInicial\n" +
+                "    var b: Int = a\n" +
+                "    var c: Int = b + constante1\n" +
+                "    \n" +
+                "    print(\"Valor de c: \")\n" +
                 "    print(c)\n" +
                 "    print(\"\\n\")\n" +
-                "    var x: Int = 0\n" +
-                "    while (x < 3) {\n" +
-                "        x = x + 1\n" +
-                "        print(\"x en while: \")\n" +
-                "        print(x)\n" +
-                "        print(\"\\n\")\n" +
-                "    }\n" +
-                "    val mensaje: String = \"Resultado: \"  \n" +
-                "    print(mensaje)\n" +
+                "\n" +
+                "    val d: Int = 10\n" +
+                "    var e: Int = d * (constante1 - 2)\n" +
+                "    \n" +
+                "    print(\"Valor de e: \")\n" +
+                "    print(e)\n" +
                 "    print(\"\\n\")\n" +
-                "    val cadenaSimple: String = \"Solo texto\"\n" +
-                "    print(cadenaSimple)\n" +
+                "\n" +
+                "    var f: Int = e\n" +
+                "    val g: Int = f / 2 + constante2\n" +
+                "    \n" +
+                "    print(\"Valor de g: \")\n" +
+                "    print(g)\n" +
+                "    print(\"\\n\")\n" +
+                "    \n" +
+                "    val h: Int = a\n" +
+                "    var i: Int = h + b\n" +
+                "    \n" +
+                "    print(\"Valor de i: \")\n" +
+                "    print(i)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    val k: Int = 7\n" +
+                "    var l: Int = k * (a + 3) - (b / c)\n" +
+                "    \n" +
+                "    print(\"Valor de l: \")\n" +
+                "    print(l)\n" +
+                "    print(\"\\n\")\n" +
+                "\n" +
+                "    print(\"Fin del programa de prueba de optimizacion.\\n\")\n" +
                 "}");
 
         outputArea = new JTextArea();
@@ -104,9 +145,19 @@ public class SimpleCalcGUI extends JFrame {
         generateIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                generateIntermediateCode();
+                generateIntermediateCode(); // Este es el que vamos a modificar para mostrar métricas
             }
         });
+
+        // NUEVO BOTÓN: Mostrar Métricas
+        JButton showMetricsButton = new JButton("Mostrar Métricas");
+        showMetricsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayMetrics(); // Nuevo método para mostrar métricas
+            }
+        });
+
 
         JButton loadFileButton = new JButton("Cargar Archivo");
         loadFileButton.addActionListener(new ActionListener() {
@@ -130,6 +181,7 @@ public class SimpleCalcGUI extends JFrame {
         buttonPanel.add(syntaxButton);
         buttonPanel.add(semanticButton);
         buttonPanel.add(generateIntermediateButton);
+        buttonPanel.add(showMetricsButton); // Añadir el nuevo botón
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
@@ -378,6 +430,7 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setCaretPosition(0);
     }
     
+    // --- MODIFICADO: generateIntermediateCode para almacenar métricas ---
     private void generateIntermediateCode() {
         outputArea.setText("");
         inputArea.getHighlighter().removeAllHighlights();
@@ -395,9 +448,15 @@ public class SimpleCalcGUI extends JFrame {
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
+        // --- Inicia medición de tiempo ---
+        long startTime = System.nanoTime();
+
         Parser parser = new Parser(tokens);
         parser.parse(); // Ejecutar parseo completo para recolectar expresiones y errores
         List<String> allParserErrors = parser.getErrors();
+
+        long endTime = System.nanoTime();
+        lastCompilationDurationMs = (endTime - startTime) / 1_000_000; // Almacenar duración en ms
 
         if (!lexicalErrors.isEmpty() || !allParserErrors.isEmpty()) {
             sb.append("--- Errores Detectados (Impiden Generación de Código Intermedio) ---\n");
@@ -412,10 +471,18 @@ public class SimpleCalcGUI extends JFrame {
             sb.append("\n>>> No se puede generar código intermedio debido a los errores anteriores. <<<\n");
             statusLabel.setText("Resultado: Generación de Intermedio FALLIDA.");
             statusLabel.setForeground(Color.RED);
+
+            // Limpiar métricas si falla
+            lastTotalQuadruples = 0;
+            lastUniqueTempVars = 0;
+
         } else {
             sb.append("--- Generación de Código Intermedio ---\n\n");
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
+            int currentTotalQuadruples = 0;
+            Set<String> currentUniqueTempVars = new HashSet<>(); 
+            
             if (expressions.isEmpty()) {
                 sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
@@ -424,8 +491,23 @@ public class SimpleCalcGUI extends JFrame {
                     sb.append("Expresión #").append(i + 1).append(" ");
                     sb.append("Linea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
+                    
+                    currentTotalQuadruples += data.quadruples.size();
+                    // Contar temporales únicas
+                    Pattern p = Pattern.compile("t\\d+");
+                    for (String quad : data.quadruples) {
+                        Matcher m = p.matcher(quad);
+                        while (m.find()) {
+                            currentUniqueTempVars.add(m.group());
+                        }
+                    }
                 }
             }
+            
+            // Almacenar métricas para el botón "Mostrar Métricas"
+            lastTotalQuadruples = currentTotalQuadruples;
+            lastUniqueTempVars = currentUniqueTempVars.size();
+
             sb.append(">>> Código intermedio generado exitosamente. <<<\n");
             statusLabel.setText("Resultado: Intermedio Generado.");
             statusLabel.setForeground(new Color(0, 128, 0));
@@ -434,6 +516,25 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
     }
+
+    // NUEVO MÉTODO para mostrar las métricas
+    private void displayMetrics() {
+        outputArea.setText(""); // Limpiar la salida anterior
+        inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
+        sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
+        sb.append("  Total de Cuádruplos generados: ").append(lastTotalQuadruples).append("\n");
+        sb.append("  Máximo de Variables Temporales distintas: ").append(lastUniqueTempVars).append("\n");
+        sb.append("\nPara obtener métricas actualizadas, genere el código intermedio primero.\n");
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+        statusLabel.setText("Métricas mostradas.");
+        statusLabel.setForeground(Color.BLUE); // Un color distinto para métricas
+    }
+
 
     private void highlightErrorFromMessage(String errorMessage) {
         try {
