@@ -22,15 +22,20 @@ public class SimpleCalcGUI extends JFrame {
     private JLabel statusLabel;
     private Highlighter.HighlightPainter errorPainter;
 
-    // NUEVOS CAMPOS para almacenar las últimas métricas generadas
-    private int lastTotalQuadruples;
-    private int lastUniqueTempVars;
-    private long lastCompilationDurationMs;
+    // Campos para almacenar métricas del Parser OPTIMIZADO
+    private int lastOptimizedTotalQuadruples;
+    private int lastOptimizedUniqueTempVars;
+    private long lastOptimizedCompilationDurationMs;
+
+    // NUEVOS CAMPOS para almacenar métricas del LegacyParser (NO OPTIMIZADO)
+    private int lastLegacyTotalQuadruples;
+    private int lastLegacyUniqueTempVars;
+    private long lastLegacyCompilationDurationMs;
 
 
     public SimpleCalcGUI() {
         setTitle("Kotlin IDE - Compilador");
-        setSize(1200, 700); 
+        setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -140,21 +145,38 @@ public class SimpleCalcGUI extends JFrame {
                 processSemanticAnalysis();
             }
         });
-        
-        JButton generateIntermediateButton = new JButton("Generar Intermedio");
-        generateIntermediateButton.addActionListener(new ActionListener() {
+
+        // Botones para el Parser OPTIMIZADO
+        JButton generateOptimizedIntermediateButton = new JButton("Generar Intermedio (Optimizado)");
+        generateOptimizedIntermediateButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                generateIntermediateCode(); // Este es el que vamos a modificar para mostrar métricas
+                generateOptimizedIntermediateCode();
             }
         });
 
-        // NUEVO BOTÓN: Mostrar Métricas
-        JButton showMetricsButton = new JButton("Mostrar Métricas");
-        showMetricsButton.addActionListener(new ActionListener() {
+        JButton showOptimizedMetricsButton = new JButton("Mostrar Métricas (Optimizado)");
+        showOptimizedMetricsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                displayMetrics(); // Nuevo método para mostrar métricas
+                displayOptimizedMetrics();
+            }
+        });
+
+        // NUEVOS BOTONES para el LegacyParser (NO OPTIMIZADO)
+        JButton generateLegacyIntermediateButton = new JButton("Generar Intermedio (No Optimizado)");
+        generateLegacyIntermediateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                generateLegacyIntermediateCode();
+            }
+        });
+
+        JButton showLegacyMetricsButton = new JButton("Mostrar Métricas (No Optimizado)");
+        showLegacyMetricsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayLegacyMetrics();
             }
         });
 
@@ -174,14 +196,16 @@ public class SimpleCalcGUI extends JFrame {
                 clearEditorAndOutput();
             }
         });
-        
+
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         buttonPanel.add(processButton);
         buttonPanel.add(lexicalButton);
         buttonPanel.add(syntaxButton);
         buttonPanel.add(semanticButton);
-        buttonPanel.add(generateIntermediateButton);
-        buttonPanel.add(showMetricsButton); // Añadir el nuevo botón
+        buttonPanel.add(generateOptimizedIntermediateButton);
+        buttonPanel.add(showOptimizedMetricsButton);
+        buttonPanel.add(generateLegacyIntermediateButton); // Añadir nuevo botón
+        buttonPanel.add(showLegacyMetricsButton);       // Añadir nuevo botón
         buttonPanel.add(loadFileButton);
         buttonPanel.add(clearButton);
 
@@ -213,17 +237,18 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
+        // Usamos el parser optimizado para la compilación completa
         Parser parser = new Parser(tokens);
-        parser.parse(); 
-        List<String> allParserErrors = parser.getErrors(); 
+        parser.parse();
+        List<String> allParserErrors = parser.getErrors();
 
         if (!lexicalErrors.isEmpty()) {
             sb.append("--- Errores Léxicos Detectados ---\n");
@@ -266,7 +291,7 @@ public class SimpleCalcGUI extends JFrame {
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         sb.append("--- Tokens Reconocidos ---\n");
         sb.append(Token.getTableHeader()).append("\n");
@@ -279,7 +304,7 @@ public class SimpleCalcGUI extends JFrame {
 
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
@@ -314,18 +339,19 @@ public class SimpleCalcGUI extends JFrame {
 
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
+        // Usamos el parser optimizado para el análisis sintáctico
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
         List<String> allParserErrors = parser.getErrors();
         List<String> syntaxErrors = allParserErrors.stream()
-                                              .filter(err -> !err.contains("Error semántico")) 
+                                              .filter(err -> !err.contains("Error semántico"))
                                               .collect(Collectors.toList());
 
         if (!lexicalErrors.isEmpty()) {
@@ -336,7 +362,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -372,16 +398,17 @@ public class SimpleCalcGUI extends JFrame {
 
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
         StringBuilder sb = new StringBuilder();
 
+        // Usamos el parser optimizado para el análisis semántico
         Parser parser = new Parser(tokens);
-        parser.parse(); 
+        parser.parse();
 
-        List<String> allParserErrors = parser.getErrors(); 
+        List<String> allParserErrors = parser.getErrors();
         List<String> semanticErrors = allParserErrors.stream()
                                                .filter(err -> err.contains("Error semántico"))
                                                .collect(Collectors.toList());
@@ -397,7 +424,7 @@ public class SimpleCalcGUI extends JFrame {
             }
             sb.append("\n");
         }
-        
+
         if (!syntaxErrors.isEmpty()) {
             sb.append("--- Errores Sintácticos Detectados ---\n");
             for (String err : syntaxErrors) {
@@ -429,34 +456,33 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
     }
-    
-    // --- MODIFICADO: generateIntermediateCode para almacenar métricas ---
-    private void generateIntermediateCode() {
+
+    // --- Métodos para el Parser OPTIMIZADO ---
+    private void generateOptimizedIntermediateCode() {
         outputArea.setText("");
         inputArea.getHighlighter().removeAllHighlights();
-        statusLabel.setText("Generando código intermedio...");
+        statusLabel.setText("Generando código intermedio (Optimizado)...");
         statusLabel.setForeground(Color.BLACK);
 
         String sourceCode = inputArea.getText();
         Lexer lexer = new Lexer(sourceCode);
         List<Token> tokens = lexer.scanTokens();
-        
+
         StringBuilder sb = new StringBuilder();
         List<String> lexicalErrors = tokens.stream()
                                            .filter(t -> t.type == Token.TokenType.ERROR)
-                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column, 
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
                                                                    t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
                                            .collect(Collectors.toList());
 
-        // --- Inicia medición de tiempo ---
         long startTime = System.nanoTime();
 
-        Parser parser = new Parser(tokens);
-        parser.parse(); // Ejecutar parseo completo para recolectar expresiones y errores
+        Parser parser = new Parser(tokens); // Usamos el Parser optimizado
+        parser.parse();
         List<String> allParserErrors = parser.getErrors();
 
         long endTime = System.nanoTime();
-        lastCompilationDurationMs = (endTime - startTime) / 1_000_000; // Almacenar duración en ms
+        lastOptimizedCompilationDurationMs = (endTime - startTime) / 1_000_000;
 
         if (!lexicalErrors.isEmpty() || !allParserErrors.isEmpty()) {
             sb.append("--- Errores Detectados (Impiden Generación de Código Intermedio) ---\n");
@@ -468,32 +494,30 @@ public class SimpleCalcGUI extends JFrame {
                 sb.append(err).append("\n");
                 highlightErrorFromMessage(err);
             }
-            sb.append("\n>>> No se puede generar código intermedio debido a los errores anteriores. <<<\n");
-            statusLabel.setText("Resultado: Generación de Intermedio FALLIDA.");
+            sb.append("\n>>> No se puede generar código intermedio optimizado debido a los errores anteriores. <<<\n");
+            statusLabel.setText("Resultado: Generación de Intermedio Optimizado FALLIDA.");
             statusLabel.setForeground(Color.RED);
 
-            // Limpiar métricas si falla
-            lastTotalQuadruples = 0;
-            lastUniqueTempVars = 0;
+            lastOptimizedTotalQuadruples = 0;
+            lastOptimizedUniqueTempVars = 0;
 
         } else {
-            sb.append("--- Generación de Código Intermedio ---\n\n");
+            sb.append("--- Generación de Código Intermedio (Optimizado) ---\n\n");
             List<Parser.ExpressionData> expressions = parser.getCollectedExpressions();
 
             int currentTotalQuadruples = 0;
-            Set<String> currentUniqueTempVars = new HashSet<>(); 
-            
+            Set<String> currentUniqueTempVars = new HashSet<>();
+
             if (expressions.isEmpty()) {
                 sb.append("No se encontraron expresiones válidas para procesar.\n");
             } else {
                 for (int i = 0; i < expressions.size(); i++) {
                     Parser.ExpressionData data = expressions.get(i);
                     sb.append("Expresión #").append(i + 1).append(" ");
-                    sb.append("Linea ").append(data.lineNumber).append("\n");
+                    sb.append("Línea ").append(data.lineNumber).append("\n");
                     sb.append(data.toString()).append("\n");
-                    
+
                     currentTotalQuadruples += data.quadruples.size();
-                    // Contar temporales únicas
                     Pattern p = Pattern.compile("t\\d+");
                     for (String quad : data.quadruples) {
                         Matcher m = p.matcher(quad);
@@ -503,13 +527,12 @@ public class SimpleCalcGUI extends JFrame {
                     }
                 }
             }
-            
-            // Almacenar métricas para el botón "Mostrar Métricas"
-            lastTotalQuadruples = currentTotalQuadruples;
-            lastUniqueTempVars = currentUniqueTempVars.size();
 
-            sb.append(">>> Código intermedio generado exitosamente. <<<\n");
-            statusLabel.setText("Resultado: Intermedio Generado.");
+            lastOptimizedTotalQuadruples = currentTotalQuadruples;
+            lastOptimizedUniqueTempVars = currentUniqueTempVars.size();
+
+            sb.append(">>> Código intermedio optimizado generado exitosamente. <<<\n");
+            statusLabel.setText("Resultado: Intermedio Optimizado Generado.");
             statusLabel.setForeground(new Color(0, 128, 0));
         }
 
@@ -517,22 +540,121 @@ public class SimpleCalcGUI extends JFrame {
         outputArea.setCaretPosition(0);
     }
 
-    // NUEVO MÉTODO para mostrar las métricas
-    private void displayMetrics() {
-        outputArea.setText(""); // Limpiar la salida anterior
-        inputArea.getHighlighter().removeAllHighlights(); // Limpiar resaltados
-        
+    private void displayOptimizedMetrics() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+
         StringBuilder sb = new StringBuilder();
-        sb.append("--- Métricas de la Última Generación de Código Intermedio ---\n");
-        sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastCompilationDurationMs).append(" ms\n");
-        sb.append("  Total de Cuádruplos generados: ").append(lastTotalQuadruples).append("\n");
-        sb.append("  Máximo de Variables Temporales distintas: ").append(lastUniqueTempVars).append("\n");
-        sb.append("\nPara obtener métricas actualizadas, genere el código intermedio primero.\n");
+        sb.append("--- Métricas de la Última Generación de Código Intermedio (Optimizado) ---\n");
+        sb.append("  Tiempo de procesamiento del Parser (con optimizaciones): ").append(lastOptimizedCompilationDurationMs).append(" ms\n");
+        sb.append("  Total de Cuádruplos generados: ").append(lastOptimizedTotalQuadruples).append("\n");
+        sb.append("  Máximo de Variables Temporales distintas: ").append(lastOptimizedUniqueTempVars).append("\n");
+        sb.append("\nPara obtener métricas actualizadas, genere el código intermedio (Optimizado) primero.\n");
 
         outputArea.setText(sb.toString());
         outputArea.setCaretPosition(0);
-        statusLabel.setText("Métricas mostradas.");
-        statusLabel.setForeground(Color.BLUE); // Un color distinto para métricas
+        statusLabel.setText("Métricas optimizadas mostradas.");
+        statusLabel.setForeground(Color.BLUE);
+    }
+
+    // --- NUEVOS Métodos para el LegacyParser (NO OPTIMIZADO) ---
+    private void generateLegacyIntermediateCode() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+        statusLabel.setText("Generando código intermedio (No Optimizado)...");
+        statusLabel.setForeground(Color.BLACK);
+
+        String sourceCode = inputArea.getText();
+        Lexer lexer = new Lexer(sourceCode);
+        List<Token> tokens = lexer.scanTokens();
+
+        StringBuilder sb = new StringBuilder();
+        List<String> lexicalErrors = tokens.stream()
+                                           .filter(t -> t.type == Token.TokenType.ERROR)
+                                           .map(t -> String.format("[Línea %d, Col %d] Error Léxico: %s", t.line, t.column,
+                                                                   t.errorMessage != null ? t.errorMessage : t.lexeme + " (Caracter inesperado)"))
+                                           .collect(Collectors.toList());
+
+        long startTime = System.nanoTime();
+
+        LegacyParser legacyParser = new LegacyParser(tokens); // Usamos el LegacyParser
+        legacyParser.parse();
+        List<String> allParserErrors = legacyParser.getErrors();
+
+        long endTime = System.nanoTime();
+        lastLegacyCompilationDurationMs = (endTime - startTime) / 1_000_000;
+
+        if (!lexicalErrors.isEmpty() || !allParserErrors.isEmpty()) {
+            sb.append("--- Errores Detectados (Impiden Generación de Código Intermedio) ---\n");
+            for (String err : lexicalErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            for (String err : allParserErrors) {
+                sb.append(err).append("\n");
+                highlightErrorFromMessage(err);
+            }
+            sb.append("\n>>> No se puede generar código intermedio no optimizado debido a los errores anteriores. <<<\n");
+            statusLabel.setText("Resultado: Generación de Intermedio No Optimizado FALLIDA.");
+            statusLabel.setForeground(Color.RED);
+
+            lastLegacyTotalQuadruples = 0;
+            lastLegacyUniqueTempVars = 0;
+
+        } else {
+            sb.append("--- Generación de Código Intermedio (No Optimizado) ---\n\n");
+            List<LegacyParser.ExpressionData> expressions = legacyParser.getCollectedExpressions(); // Usar LegacyParser.ExpressionData
+
+            int currentTotalQuadruples = 0;
+            Set<String> currentUniqueTempVars = new HashSet<>();
+
+            if (expressions.isEmpty()) {
+                sb.append("No se encontraron expresiones válidas para procesar.\n");
+            } else {
+                for (int i = 0; i < expressions.size(); i++) {
+                    LegacyParser.ExpressionData data = expressions.get(i); // Usar LegacyParser.ExpressionData
+                    sb.append("Expresión #").append(i + 1).append(" ");
+                    sb.append("Línea ").append(data.lineNumber).append("\n");
+                    sb.append(data.toString()).append("\n");
+
+                    currentTotalQuadruples += data.quadruples.size();
+                    Pattern p = Pattern.compile("t\\d+");
+                    for (String quad : data.quadruples) {
+                        Matcher m = p.matcher(quad);
+                        while (m.find()) {
+                            currentUniqueTempVars.add(m.group());
+                        }
+                    }
+                }
+            }
+
+            lastLegacyTotalQuadruples = currentTotalQuadruples;
+            lastLegacyUniqueTempVars = currentUniqueTempVars.size();
+
+            sb.append(">>> Código intermedio no optimizado generado exitosamente. <<<\n");
+            statusLabel.setText("Resultado: Intermedio No Optimizado Generado.");
+            statusLabel.setForeground(new Color(0, 128, 0));
+        }
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+    }
+
+    private void displayLegacyMetrics() {
+        outputArea.setText("");
+        inputArea.getHighlighter().removeAllHighlights();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- Métricas de la Última Generación de Código Intermedio (No Optimizado) ---\n");
+        sb.append("  Tiempo de procesamiento del Parser (sin optimizaciones): ").append(lastLegacyCompilationDurationMs).append(" ms\n");
+        sb.append("  Total de Cuádruplos generados: ").append(lastLegacyTotalQuadruples).append("\n");
+        sb.append("  Máximo de Variables Temporales distintas: ").append(lastLegacyUniqueTempVars).append("\n");
+        sb.append("\nPara obtener métricas actualizadas, genere el código intermedio (No Optimizado) primero.\n");
+
+        outputArea.setText(sb.toString());
+        outputArea.setCaretPosition(0);
+        statusLabel.setText("Métricas no optimizadas mostradas.");
+        statusLabel.setForeground(Color.MAGENTA); // Un color distinto para métricas legacy
     }
 
 
@@ -543,10 +665,10 @@ public class SimpleCalcGUI extends JFrame {
                 String[] parts = locationPart.split(",");
                 int line = Integer.parseInt(parts[0].replace("Línea ", "").trim());
                 int col = Integer.parseInt(parts[1].replace("Col ", "").trim());
-                
+
                 String lexemeToHighlight = "";
                 int lexemeLength = 1;
-                
+
                 int startLexicalError = errorMessage.indexOf("Error Léxico: '");
                 if (startLexicalError != -1) {
                     startLexicalError += "Error Léxico: '".length();
@@ -558,7 +680,7 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 int startSyntaxSemanticError = errorMessage.indexOf("Error en '");
                 if (startSyntaxSemanticError != -1) {
                      startSyntaxSemanticError += "Error en '".length();
@@ -581,7 +703,7 @@ public class SimpleCalcGUI extends JFrame {
                         return;
                     }
                 }
-                
+
                 highlightError(line, col, 1);
 
             }
@@ -601,7 +723,7 @@ public class SimpleCalcGUI extends JFrame {
 
             int startOffset = inputArea.getLineStartOffset(docLine) + docCol;
             int endOffset = startOffset + length;
-            
+
             if (startOffset < inputArea.getDocument().getLength()) {
                  endOffset = Math.min(endOffset, inputArea.getDocument().getLength());
                  endOffset = Math.min(endOffset, inputArea.getLineEndOffset(docLine));
@@ -651,6 +773,4 @@ public class SimpleCalcGUI extends JFrame {
         statusLabel.setText("Editor y salida limpios.");
         statusLabel.setForeground(Color.BLACK);
     }
-
-
 }
