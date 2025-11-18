@@ -14,6 +14,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.HashSet;
 import java.util.Set;
+import javax.swing.JFileChooser;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 
 public class SimpleCalcGUI extends JFrame {
@@ -615,13 +619,27 @@ public class SimpleCalcGUI extends JFrame {
             statusLabel.setText("Código SimpleCalc optimizado generado y mostrado.");
             statusLabel.setForeground(Color.BLUE);
             
-            //Guardar automáticamente en un archivo .txt
-            java.nio.file.Path outputPath = java.nio.file.Paths.get("codigo_optimizado.txt");
-            java.nio.file.Files.write(outputPath, optimizedKotlinCode.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            JFileChooser fileChooser = new JFileChooser();
+// Establece un nombre de archivo por defecto
+fileChooser.setSelectedFile(new File("codigo_optimizado.txt"));
+int userSelection = fileChooser.showSaveDialog(null); // 'null' si no es un componente padre específico
 
-            statusLabel.setText("Código Kotlin optimizado generado y guardado en 'codigo_optimizado.txt'.");
-            statusLabel.setForeground(new Color(0, 128, 0));
+if (userSelection == JFileChooser.APPROVE_OPTION) {
+    File fileToSave = fileChooser.getSelectedFile();
+    Path outputPath = fileToSave.toPath();
+    
+    // Guardar el archivo
+    Files.write(outputPath, optimizedKotlinCode.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
+    // Informar al usuario con la ruta ABSOLUTA que eligió
+    statusLabel.setText("Código Kotlin optimizado generado y guardado en:\n" + 
+                         fileToSave.getAbsolutePath());
+    statusLabel.setForeground(new Color(0, 128, 0));
+} else {
+    // El usuario canceló la operación
+    statusLabel.setText("Guardado de archivo cancelado.");
+    statusLabel.setForeground(Color.RED);
+}
 
 
         } catch (Exception ex) {
